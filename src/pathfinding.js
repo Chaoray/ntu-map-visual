@@ -110,9 +110,9 @@ class PathFinder {
         let snapshots = [];
 
         const totalNodeSize = Object.keys(graph).length;
-        const vis = new Array(this.totalNodeSize).fill(false);
-        const dis = new Array(this.totalNodeSize).fill(Number.POSITIVE_INFINITY);
-        const pre = new Array(this.totalNodeSize).fill(-1);
+        const vis = new Array(totalNodeSize).fill(false);
+        const dis = new Array(totalNodeSize).fill(Number.POSITIVE_INFINITY);
+        const pre = new Array(totalNodeSize).fill(-1);
 
         const visitedNodes = [];
 
@@ -156,7 +156,7 @@ class PathFinder {
         if (Number.isFinite(dis[end])) {
             path = [`${end}`];
             let curr = end;
-            while (curr != -1) {
+            while (pre[curr] !== `${curr}`) {
                 path.unshift(pre[curr]);
                 curr = pre[curr];
             }
