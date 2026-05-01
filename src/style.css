@@ -1,0 +1,22 @@
+/* --- 基礎排版保持不變，加入以下新樣式 --- */
+* { box-sizing: border-box; }
+body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; background: #111; color: #fff;}
+.container { display: flex; width: 100%; height: 100%; }
+.sidebar { width: 300px; background: #222; padding: 20px; display: flex; flex-direction: column; gap: 15px; border-right: 1px solid #444; }
+#canvas-container { flex-grow: 1; position: relative; overflow: hidden;}
+button { padding: 10px; background: #00ffaa; color: #000; border: none; cursor: pointer; font-weight: bold; border-radius: 4px; }
+button:hover { background: #00cc88; }
+.input-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: #aaa;}
+
+/* --- 🌟 客製化下拉選單樣式 --- */
+.custom-select { position: relative; width: 100%; font-size: 0.9rem; }
+.select-selected { background-color: #333; color: white; padding: 8px 12px; border: 1px solid #555; border-radius: 4px; cursor: pointer; user-select: none; }
+.select-items { position: absolute; background-color: #333; top: 100%; left: 0; right: 0; z-index: 99; max-height: 200px; overflow-y: auto; border: 1px solid #555; border-radius: 4px; margin-top: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+.select-items div { padding: 8px 12px; cursor: pointer; color: white; border-bottom: 1px solid #444; }
+.select-items div:hover, .same-as-selected { background-color: #00ffaa; color: black; }
+.select-hide { display: none; }
+
+/* --- 結果輸出區塊樣式 --- */
+.result-box { margin-top: 10px; padding: 15px; background-color: #0a0a0a; border: 1px solid #333; border-radius: 6px; display: flex; flex-direction: column; gap: 10px; flex-grow: 1; }
+.result-box h3 { color: #00ffaa; font-size: 1rem; margin: 0;}
+.path-scroll { background-color: #111; color: #add8e6; padding: 12px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; line-height: 1.8; flex-grow: 1; overflow-y: auto; border-left: 3px solid #00ffaa; }

@@ -1,15 +1,52 @@
 <!doctype html>
-<html lang="en">
-
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ntu-map-visual</title>
-</head>
-
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>台大路徑規劃系統</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+  </head>
+  
 <body>
-  <script type="module" src="/src/main.js"></script>
-</body>
+<div class="container">
+  <aside class="sidebar">
+    <h2>NTU Navigator</h2>
+    
+    <div class="input-group">
+      <label>起點 (可於地圖點擊)</label>
+      <!-- 客製化下拉選單 -->
+      <div class="custom-select" id="startSelectBox">
+        <div class="select-selected" id="startSelected">請選擇起點...</div>
+        <div class="select-items select-hide" id="startItems"></div>
+      </div>
+    </div>
 
+    <div class="input-group">
+      <label>終點 (可於地圖點擊)</label>
+      <!-- 客製化下拉選單 -->
+      <div class="custom-select" id="endSelectBox">
+        <div class="select-selected" id="endSelected">請選擇終點...</div>
+        <div class="select-items select-hide" id="endItems"></div>
+      </div>
+    </div>
+
+    <button id="searchBtn">開始 Dijkstra 尋路</button>
+
+    <div class="result-box">
+      <h3>📍 導航結果</h3>
+      <p id="distanceOutput">總距離：-- 公尺</p>
+      
+      <div id="pathOutput" class="path-scroll">
+        請設定起點與終點，並點擊開始規劃。
+      </div>
+    </div>
+  </aside>
+
+  <div id="canvas-container"></div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
 </html>
