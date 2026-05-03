@@ -4,49 +4,133 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>台大路徑規劃系統</title>
+    <title>路徑規劃與演算法視覺化系統</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    <style>
+      /* 新增：導覽列樣式 */
+      #top-nav {
+        background-color: #1a1a1a;
+        padding: 10px;
+        text-align: center;
+        border-bottom: 2px solid #444;
+      }
+      #top-nav button {
+        background-color: #333;
+        color: white;
+        border: 1px solid #666;
+        padding: 8px 16px;
+        margin: 0 10px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 16px;
+      }
+      #top-nav button:hover {
+        background-color: #555;
+      }
+      #top-nav button.active {
+        background-color: #ff8c00; /* 亮橘色表示選中 */
+        color: black;
+        font-weight: bold;
+      }
+      
+      /* 隱藏/顯示控制 */
+      .hidden {
+        display: none !important;
+      }
+      
+      /* 原本的容器樣式 (簡化示意，請保留你原本的 style.css) */
+      body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; background-color: #121212; color: white;}
+      .content-wrapper { display: flex; flex: 1; overflow: hidden; }
+      .sidebar { width: 300px; padding: 20px; background-color: #222; border-right: 1px solid #444; overflow-y: auto;}
+      #canvas-container { flex: 1; position: relative; }
+      #infinite-castle-container { flex: 1; display: flex; align-items: center; justify-content: center; background-color: #000; overflow: hidden; }
+    </style>
   </head>
   
 <body>
-<div class="container">
-  <aside class="sidebar">
-    <h2>NTU Navigator</h2>
-    
-    <div class="input-group">
-      <label>起點 (可於地圖點擊)</label>
-      <!-- 客製化下拉選單 -->
-      <div class="custom-select" id="startSelectBox">
-        <div class="select-selected" id="startSelected">請選擇起點...</div>
-        <div class="select-items select-hide" id="startItems"></div>
-      </div>
+  <!-- 新增：頂部切換導覽列 -->
+  <div id="top-nav">
+    <button id="btn-ntu-map" class="active">🗺️ NTU Map 導航</button>
+    <button id="btn-infinite-castle">👹 無限城 Dijkstra 模擬</button>
+  </div>
+
+  <div class="content-wrapper">
+    <!-- 原本的 NTU Map 介面 -->
+    <div id="ntu-map-view" style="display: flex; width: 100%;">
+      <aside class="sidebar">
+        <h2>NTU Navigator</h2>
+        
+        <div class="input-group">
+          <label>起點 (可於地圖點擊)</label>
+          <div class="custom-select" id="startSelectBox">
+            <div class="select-selected" id="startSelected">請選擇起點...</div>
+            <div class="select-items select-hide" id="startItems"></div>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label>終點 (可於地圖點擊)</label>
+          <div class="custom-select" id="endSelectBox">
+            <div class="select-selected" id="endSelected">請選擇終點...</div>
+            <div class="select-items select-hide" id="endItems"></div>
+          </div>
+        </div>
+
+        <button id="searchBtn">開始 Dijkstra 尋路</button>
+
+        <div class="result-box">
+          <h3>📍 導航結果</h3>
+          <p id="distanceOutput">總距離：-- 公尺</p>
+          
+          <div id="pathOutput" class="path-scroll">
+            請設定起點與終點，並點擊開始規劃。
+          </div>
+        </div>
+      </aside>
+
+      <div id="canvas-container"></div>
     </div>
 
-    <div class="input-group">
-      <label>終點 (可於地圖點擊)</label>
-      <!-- 客製化下拉選單 -->
-      <div class="custom-select" id="endSelectBox">
-        <div class="select-selected" id="endSelected">請選擇終點...</div>
-        <div class="select-items select-hide" id="endItems"></div>
-      </div>
+    <!-- 新增：無限城 Dijkstra 介面 (初始隱藏) -->
+    <div id="infinite-castle-view" class="hidden" style="width: 100%; height: 100%;">
+        <!-- p5.js canvas 會被掛載在這裡 -->
+        <div id="infinite-castle-container" style="width: 100%; height: 100%;"></div>
     </div>
 
-    <button id="searchBtn">開始 Dijkstra 尋路</button>
+  </div>
 
-    <div class="result-box">
-      <h3>📍 導航結果</h3>
-      <p id="distanceOutput">總距離：-- 公尺</p>
-      
-      <div id="pathOutput" class="path-scroll">
-        請設定起點與終點，並點擊開始規劃。
-      </div>
-    </div>
-  </aside>
+  <!-- 載入你原本的 main.js -->
+  <script type="module" src="/src/main.js"></script>
+  
+  <!-- 載入新的無限城模組 (稍後建立) -->
+  <script type="module" src="/src/infinite-castle.js"></script>
 
-  <div id="canvas-container"></div>
-</div>
+  <!-- 介面切換邏輯 -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const btnNtu = document.getElementById('btn-ntu-map');
+      const btnCastle = document.getElementById('btn-infinite-castle');
+      const viewNtu = document.getElementById('ntu-map-view');
+      const viewCastle = document.getElementById('infinite-castle-view');
 
-<script type="module" src="/src/main.js"></script>
+      btnNtu.addEventListener('click', () => {
+        btnNtu.classList.add('active');
+        btnCastle.classList.remove('active');
+        viewNtu.classList.remove('hidden');
+        viewCastle.classList.add('hidden');
+        // 可以觸發一個事件讓 p5.js 知道畫面切換了，需要重新 resize
+        window.dispatchEvent(new Event('resize'));
+      });
+
+      btnCastle.addEventListener('click', () => {
+        btnCastle.classList.add('active');
+        btnNtu.classList.remove('active');
+        viewCastle.classList.remove('hidden');
+        viewNtu.classList.add('hidden');
+        window.dispatchEvent(new Event('resize'));
+      });
+    });
+  </script>
 </body>
 </html>
