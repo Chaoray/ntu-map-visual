@@ -1,4 +1,5 @@
 import './style.css';
+import { PathFinder } from './pathfinding.js'; // 🌟 檔名修正為 pathfinding.js
 
 let coordData, graphData, locationData;
 
@@ -67,29 +68,35 @@ function draw() {
         }
     }
 
-    // 🌟 3. 繪製 Dijkstra 動畫 (雷達波浪效果)
+    // 🌟 3. 繪製 Dijkstra 動畫 (雷達波浪效果，讀取隊友算出的 snapshots)
     if (isAnimating && snapshots.length > 0) {
         let activeSnapshot = snapshots[animIndex];
         
         // 走過的點：縮小並加上透明度，避免畫面太髒
         fill(50, 200, 100, 60);
         noStroke();
-        activeSnapshot.visitedNodes.forEach(id => {
-            let [lon, lat] = coordData[id];
-            circle(map(lon, minLon, maxLon, 0, width), map(lat, maxLat, minLat, 0, height), 3);
-        });
+        if (activeSnapshot.visitedNodes) {
+            activeSnapshot.visitedNodes.forEach(id => {
+                let coords = coordData[id];
+                if(coords) circle(map(coords[0], minLon, maxLon, 0, width), map(coords[1], maxLat, minLat, 0, height), 3);
+            });
+        }
 
         // 探索邊界：凸顯橘色，看起來像擴散的波紋
         fill(255, 165, 0, 180);
-        activeSnapshot.frontierNodes.forEach(id => {
-            let [lon, lat] = coordData[id];
-            circle(map(lon, minLon, maxLon, 0, width), map(lat, maxLat, minLat, 0, height), 5);
-        });
+        if (activeSnapshot.frontierNodes) {
+            activeSnapshot.frontierNodes.forEach(id => {
+                let coords = coordData[id];
+                if(coords) circle(map(coords[0], minLon, maxLon, 0, width), map(coords[1], maxLat, minLat, 0, height), 5);
+            });
+        }
 
         // 當前檢查點：黃色光圈
         fill(255, 255, 0);
-        let [clon, clat] = coordData[activeSnapshot.currentNode];
-        circle(map(clon, minLon, maxLon, 0, width), map(clat, maxLat, minLat, 0, height), 8);
+        if (activeSnapshot.currentNode !== null && coordData[activeSnapshot.currentNode]) {
+            let [clon, clat] = coordData[activeSnapshot.currentNode];
+            circle(map(clon, minLon, maxLon, 0, width), map(clat, maxLat, minLat, 0, height), 8);
+        }
 
         // 🚀 動態快轉引擎：根據總步數計算每次要跳過幾幀，確保動畫在 1.5 秒內播完
         let playbackSpeed = Math.max(1, Math.floor(snapshots.length / 60)); 
@@ -111,8 +118,10 @@ function draw() {
         noFill();
         beginShape(); 
         for (let id of currentPath) {
-            let [px, py] = [map(coordData[id][0], minLon, maxLon, 0, width), map(coordData[id][1], maxLat, minLat, 0, height)];
-            vertex(px, py); 
+            if(coordData[id]) {
+                let [px, py] = [map(coordData[id][0], minLon, maxLon, 0, width), map(coordData[id][1], maxLat, minLat, 0, height)];
+                vertex(px, py); 
+            }
         }
         endShape(); 
     }
@@ -202,63 +211,6 @@ function windowResized() {
 
 window.preload = preload; window.setup = setup; window.draw = draw; window.windowResized = windowResized; window.mouseMoved = mouseMoved; window.mousePressed = mousePressed;
 
-// Dijkstra 演算法
-function calculateDijkstraSnapshots(startId, endId) {
-    let distInfo = {};
-    let prev = {};
-    let pq = []; 
-    let visited = new Set();
-    let resultSnapshots = [];
-
-    for (let id in coordData) distInfo[id] = Infinity;
-    distInfo[startId] = 0;
-    pq.push({ id: startId, d: 0 });
-
-    while (pq.length > 0) {
-        pq.sort((a, b) => a.d - b.d);
-        let current = pq.shift();
-        let currId = current.id;
-
-        if (visited.has(currId)) continue;
-        visited.add(currId);
-
-        resultSnapshots.push({
-            currentNode: currId,
-            visitedNodes: Array.from(visited),
-            frontierNodes: pq.map(n => n.id),
-            isFinished: currId === endId,
-            finalPath: null
-        });
-
-        if (currId === endId) {
-            let path = [];
-            let step = endId;
-            while (step) {
-                path.unshift(step);
-                step = prev[step];
-            }
-            resultSnapshots[resultSnapshots.length - 1].finalPath = path;
-            break;
-        }
-
-        let neighbors = graphData[currId] || {};
-        for (let toId in neighbors) {
-            if (visited.has(toId)) continue;
-            let c1 = coordData[currId];
-            let c2 = coordData[toId];
-            let actualDist = Math.sqrt(Math.pow(c1[0]-c2[0], 2) + Math.pow(c1[1]-c2[1], 2));
-            
-            let alt = distInfo[currId] + actualDist;
-            if (alt < distInfo[toId]) {
-                distInfo[toId] = alt;
-                prev[toId] = currId;
-                pq.push({ id: toId, d: alt });
-            }
-        }
-    }
-    return resultSnapshots;
-}
-
 // 客製化下拉選單
 function initCustomSelect() {
     createSelectItems('startItems', 'startSelected', (id) => currentStartId = id);
@@ -301,7 +253,7 @@ function closeAllSelect(except) {
     });
 }
 
-// 按鈕執行邏輯
+// 🌟 完美串接隊友 PathFinder 的按鈕邏輯
 window.onload = () => {
   const searchBtn = document.getElementById('searchBtn');
   
@@ -311,28 +263,40 @@ window.onload = () => {
       return;
     }
 
-    // 清除舊的軌跡
+    // 清除舊的軌跡與狀態
     currentPath = [];
+    snapshots = [];
+    isAnimating = false;
     
     const startName = locationData[currentStartId];
     const endName = locationData[currentEndId];
 
-    document.getElementById('pathOutput').innerHTML = '<span style="color: #ffff00;">📡 Dijkstra 演算法計算中...</span>';
-    
-    snapshots = calculateDijkstraSnapshots(currentStartId, currentEndId);
-    
-    animIndex = 0;
-    isAnimating = true;
+    document.getElementById('pathOutput').innerHTML = '<span style="color: #ffff00;">📡 演算法運算中...</span>';
 
-    document.getElementById('distanceOutput').innerText = `總距離：計算完成`;
-    document.getElementById('pathOutput').innerHTML = `
-      開始導航 (Dijkstra 擴散尋路)<br>
-      ----------------------<br>
-      🚶‍♂️ 出發：${startName}<br>
-      🌊 演算法波紋擴散中...<br>
-      🏁 抵達：${endName}<br>
-      ----------------------<br>
-      ✨ 動畫展示中...
-    `;
+    try {
+        // 🚀 1. 呼叫隊友寫好的類別
+        const pf = new PathFinder();
+        
+        // 🚀 2. 丟入起點終點，瞬間拿到運算結果的陣列！
+        snapshots = pf.runPathfinding(Number(currentStartId), Number(currentEndId));
+        
+        // 🚀 3. 啟動我們的 p5.js 動畫播放器
+        animIndex = 0;
+        isAnimating = true;
+
+        document.getElementById('distanceOutput').innerText = `狀態：計算完成`;
+        document.getElementById('pathOutput').innerHTML = `
+          開始導航 (Dijkstra 擴散尋路)<br>
+          ----------------------<br>
+          🚶‍♂️ 出發：${startName}<br>
+          🌊 演算法波紋擴散中...<br>
+          🏁 抵達：${endName}<br>
+          ----------------------<br>
+          ✨ 動畫展示中...
+        `;
+    } catch (error) {
+        console.error("PathFinder 執行失敗:", error);
+        document.getElementById('pathOutput').innerHTML = `<span style="color: #ff4444;">⚠️ 演算法執行發生錯誤，請按 F12 檢查 Console！</span>`;
+    }
   });
 };
