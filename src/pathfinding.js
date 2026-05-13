@@ -1,4 +1,6 @@
 import graph from './assets/graph.json' with { type: 'json' };
+import coordinates from './assets/coordinates.json' with { type: 'json' };
+import coordinates from './assets/coordinates.json' with { type: 'json' };
 
 class PriorityQueue {
     elements = [];
@@ -97,6 +99,17 @@ class DijkstraNode {
     }
 }
 
+class AStarNode {
+    constructor(weight = 0, data) {
+        this.weight = weight;
+        this.data = data;
+    }
+
+    valueOf() {
+        return this.weight;
+    }
+}
+
 class PathFinder {
 
     /**
@@ -105,7 +118,7 @@ class PathFinder {
      * @param {Number} end 
      * @returns {Array[]} A series of node id on the path.
      */
-    runPathfinding(start, end) {
+    dijkstra(start, end) {
         let step = 0;
         let snapshots = [];
 
@@ -168,6 +181,105 @@ class PathFinder {
             visitedNodes: [...visitedNodes],
             frontierNodes: null,
             currentDistances: [...dis],
+            isFinished: true,
+            finalPath: path
+        });
+
+        return snapshots;
+    }
+
+    /**
+     * Find the shortest path using the A* algorithm.
+     * @param {Number} start
+     * @param {Number} end
+     * @returns {Array[]} A series of node id on the path.
+     */
+    aStar(start, end) {
+        let step = 0;
+        let snapshots = [];
+
+        const totalNodeSize = Object.keys(graph).length;
+        const vis = new Array(totalNodeSize).fill(false);
+        const gScore = new Array(totalNodeSize).fill(Number.POSITIVE_INFINITY);
+        const fScore = new Array(totalNodeSize).fill(Number.POSITIVE_INFINITY);
+        const pre = new Array(totalNodeSize).fill(-1);
+
+        const visitedNodes = [];
+        const closedSet = new Set();
+
+        const heuristic = (from, to) => {
+            const fromCoords = coordinates[from];
+            const toCoords = coordinates[to];
+
+            if (!fromCoords || !toCoords) {
+                return 0;
+            }
+
+            const deltaLon = fromCoords[0] - toCoords[0];
+            const deltaLat = fromCoords[1] - toCoords[1];
+            return Math.hypot(deltaLon, deltaLat);
+        };
+
+        const pq = new PriorityQueue(false);
+        gScore[start] = 0;
+        fScore[start] = heuristic(start, end);
+        pre[start] = `${start}`;
+        pq.push(new AStarNode(fScore[start], start));
+
+        while (!pq.empty()) {
+            const n = pq.pop();
+            const u = Number(n.data);
+
+            if (closedSet.has(u)) continue;
+            closedSet.add(u);
+            vis[u] = true;
+            visitedNodes.push(u);
+
+            snapshots.push({
+                step: step++,
+                currentNode: u,
+                visitedNodes: [...visitedNodes],
+                frontierNodes: pq.elements.map(e => e.data),
+                currentDistances: [...gScore],
+                isFinished: false,
+                finalPath: null
+            });
+
+            if (u === end) {
+                break;
+            }
+
+            const neighbors = graph[u] || {};
+            for (const vKey of Object.keys(neighbors)) {
+                const v = Number(vKey);
+                if (closedSet.has(v)) continue;
+
+                const tentativeG = gScore[u] + neighbors[vKey];
+                if (tentativeG < gScore[v]) {
+                    gScore[v] = tentativeG;
+                    fScore[v] = tentativeG + heuristic(v, end);
+                    pre[v] = `${u}`;
+                    pq.push(new AStarNode(fScore[v], v));
+                }
+            }
+        }
+
+        let path = null;
+        if (Number.isFinite(gScore[end])) {
+            path = [`${end}`];
+            let curr = end;
+            while (pre[curr] !== `${curr}`) {
+                path.unshift(pre[curr]);
+                curr = Number(pre[curr]);
+            }
+        }
+
+        snapshots.push({
+            step: step++,
+            currentNode: null,
+            visitedNodes: [...visitedNodes],
+            frontierNodes: null,
+            currentDistances: [...gScore],
             isFinished: true,
             finalPath: path
         });
