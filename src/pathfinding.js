@@ -1,6 +1,5 @@
 import graph from './assets/graph.json' with { type: 'json' };
 import coordinates from './assets/coordinates.json' with { type: 'json' };
-import coordinates from './assets/coordinates.json' with { type: 'json' };
 
 class PriorityQueue {
     elements = [];
