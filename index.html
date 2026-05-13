@@ -77,7 +77,15 @@
           </div>
         </div>
 
-        <button id="searchBtn">開始 Dijkstra 尋路</button>
+        <div class="input-group">
+          <label for="algorithmSelect">演算法</label>
+          <select id="algorithmSelect" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #666; background: #2a2a2a; color: white;">
+            <option value="dijkstra">Dijkstra</option>
+            <option value="astar" selected>A*</option>
+          </select>
+        </div>
+
+        <button id="searchBtn">開始尋路</button>
 
         <div class="result-box">
           <h3>📍 導航結果</h3>
