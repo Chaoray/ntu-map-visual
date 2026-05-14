@@ -1,19 +1,36 @@
-import './style.css';
+import { PathFinder } from './pathfinding.js'; 
 
 let coordData, graphData, locationData;
 
+// --- 系統狀態管理 ---
+let appState = 'INTRO'; // INTRO, SELECT, PLAYBACK, RESULT
+let playMode = 'AUTO'; // AUTO, MANUAL
+let algo = 'DIJKSTRA'; // DIJKSTRA, ASTAR
+let mapClickMode = 'START'; // START, END
+
+// --- 導航資料 ---
 let currentStartId = null;
 let currentEndId = null;
-let mapHoveredNodeId = null;  
-let listHoveredNodeId = null; 
-
-// 獨立儲存最終路線，確保動畫結束後不會消失
 let currentPath = [];
-
-// 動畫播放狀態
 let snapshots = [];
 let animIndex = 0;
-let isAnimating = false;
+
+// --- 播放器狀態 ---
+let isPlaying = false;
+// 速度維持較快設定
+let autoPlaySpeed = 2; 
+let frameCounter = 0;
+
+// --- 畫布拖曳與縮放 (Pan & Zoom) ---
+let zoom = 1;
+let offsetX = 0;
+let offsetY = 0;
+let isDraggingMap = false;
+let dragStartX = 0;
+let dragStartY = 0;
+
+// 預先計算好的地圖邊界映射 (為了效能)
+const mapBounds = { minLon: 121.530, maxLon: 121.550, minLat: 25.008, maxLat: 25.025 };
 
 function preload() {
   coordData = loadJSON('/coordinates.json');
@@ -25,174 +42,249 @@ function setup() {
   let container = document.getElementById('canvas-container');
   let canvas = createCanvas(container.clientWidth, container.clientHeight);
   canvas.parent('canvas-container');
-  console.log("地圖資料載入成功！"); 
-  initCustomSelect();
+  
+  // 置中地圖初始視角
+  offsetX = width / 2;
+  offsetY = height / 2;
+  
+  initUI();
 }
 
 function draw() {
-    background(10); 
+    background(18); 
 
-    let minLon = 121.530, maxLon = 121.550;
-    let minLat = 25.008, maxLat = 25.025;
-
-    // 1. 畫底層道路 (灰色)
-    if (graphData && coordData) {
-        stroke(50, 50, 50); 
-        strokeWeight(1);    
-        for (let fromId in graphData) {
-            let fromCoords = coordData[fromId];
-            if (!fromCoords) continue;
-            let x1 = map(fromCoords[0], minLon, maxLon, 0, width);
-            let y1 = map(fromCoords[1], maxLat, minLat, 0, height);
-
-            for (let toId in graphData[fromId]) {
-                let toCoords = coordData[toId];
-                if (!toCoords) continue;
-                let x2 = map(toCoords[0], minLon, maxLon, 0, width);
-                let y2 = map(toCoords[1], maxLat, minLat, 0, height);
-                line(x1, y1, x2, y2);
+    // 處理自動播放邏輯
+    if (appState === 'PLAYBACK' && isPlaying && snapshots.length > 0) {
+        frameCounter++;
+        if (frameCounter >= autoPlaySpeed) {
+            frameCounter = 0;
+            if (animIndex < snapshots.length - 1) {
+                animIndex++;
+                document.getElementById('playback-status').innerText = `目前步數: ${animIndex + 1} / ${snapshots.length}`;
+            } else {
+                handlePlaybackFinish();
             }
         }
     }
 
-    // 2. 畫基礎節點 (微弱的深綠點，減少視覺干擾)
-    if (coordData) {
-        fill(30, 80, 50, 100); 
-        noStroke(); 
-        for (let id in coordData) {
-            let [lon, lat] = coordData[id];
-            let x = map(lon, minLon, maxLon, 0, width);
-            let y = map(lat, maxLat, minLat, 0, height); 
-            circle(x, y, 1.5); 
-        }
-    }
+    // 🌟 套用畫布變換 (Pan & Zoom)
+    push();
+    translate(offsetX, offsetY);
+    scale(zoom);
+    // 把繪圖原點移回左上角，方便使用原本的 mapping
+    translate(-width/2, -height/2);
 
-    // 🌟 3. 繪製 Dijkstra 動畫 (雷達波浪效果)
-    if (isAnimating && snapshots.length > 0) {
-        let activeSnapshot = snapshots[animIndex];
-        
-        // 走過的點：縮小並加上透明度，避免畫面太髒
-        fill(50, 200, 100, 60);
-        noStroke();
-        activeSnapshot.visitedNodes.forEach(id => {
-            let [lon, lat] = coordData[id];
-            circle(map(lon, minLon, maxLon, 0, width), map(lat, maxLat, minLat, 0, height), 3);
-        });
+    drawEdges();
+    drawNodesAndState();
 
-        // 探索邊界：凸顯橘色，看起來像擴散的波紋
-        fill(255, 165, 0, 180);
-        activeSnapshot.frontierNodes.forEach(id => {
-            let [lon, lat] = coordData[id];
-            circle(map(lon, minLon, maxLon, 0, width), map(lat, maxLat, minLat, 0, height), 5);
-        });
+    pop();
+    
+    // 繪製非縮放的 UI 提示
+    drawHoverTooltip();
+}
 
-        // 當前檢查點：黃色光圈
-        fill(255, 255, 0);
-        let [clon, clat] = coordData[activeSnapshot.currentNode];
-        circle(map(clon, minLon, maxLon, 0, width), map(clat, maxLat, minLat, 0, height), 8);
+// ==========================================
+// 繪圖模組
+// ==========================================
+function drawEdges() {
+    strokeWeight(1.5 / zoom); // 🌟 道路寬度隨縮放調整，保持視覺統一
+    for (let fromId in graphData) {
+        let fromC = coordData[fromId];
+        if (!fromC) continue;
+        let x1 = map(fromC[0], mapBounds.minLon, mapBounds.maxLon, 0, width);
+        let y1 = map(fromC[1], mapBounds.maxLat, mapBounds.minLat, 0, height);
 
-        // 🚀 動態快轉引擎：根據總步數計算每次要跳過幾幀，確保動畫在 1.5 秒內播完
-        let playbackSpeed = Math.max(1, Math.floor(snapshots.length / 60)); 
-        animIndex += playbackSpeed;
-
-        // 如果播到最後一步了
-        if (animIndex >= snapshots.length - 1) {
-            animIndex = snapshots.length - 1;
-            // 把最終路徑交接給全域變數，確保它永不消失
-            currentPath = snapshots[animIndex].finalPath || [];
-            isAnimating = false; // 結束動畫
-        }
-    }
-
-    // 🌟 4. 畫出最終導航路徑 (寶藍色粗線，獨立於動畫之外)
-    if (!isAnimating && currentPath.length > 0) {
-        stroke(65, 105, 225); 
-        strokeWeight(4);      
-        noFill();
-        beginShape(); 
-        for (let id of currentPath) {
-            let [px, py] = [map(coordData[id][0], minLon, maxLon, 0, width), map(coordData[id][1], maxLat, minLat, 0, height)];
-            vertex(px, py); 
-        }
-        endShape(); 
-    }
-
-    // 5. 畫起終點標記
-    if (currentStartId && coordData[currentStartId]) {
-        let [x, y] = [map(coordData[currentStartId][0], minLon, maxLon, 0, width), map(coordData[currentStartId][1], maxLat, minLat, 0, height)];
-        fill(255, 255, 0); noStroke(); circle(x, y, 14); 
-    }
-    if (currentEndId && coordData[currentEndId]) {
-        let [x, y] = [map(coordData[currentEndId][0], minLon, maxLon, 0, width), map(coordData[currentEndId][1], maxLat, minLat, 0, height)];
-        fill(234, 67, 53); noStroke(); circle(x, y, 14); 
-    }
-
-    // 6. 處理 Hover 放大與 Tooltip
-    let highlightId = listHoveredNodeId || mapHoveredNodeId;
-    if (highlightId && coordData[highlightId]) {
-        let hx = map(coordData[highlightId][0], minLon, maxLon, 0, width);
-        let hy = map(coordData[highlightId][1], maxLat, minLat, 0, height);
-        
-        fill(0, 255, 170, 200); 
-        noStroke();
-        circle(hx, hy, 16); 
-
-        if (locationData[highlightId]) {
-            let name = locationData[highlightId];
-            textSize(14);
-            let tw = textWidth(name);
-            fill(0, 200);
-            rect(hx + 10, hy - 25, tw + 20, 30, 5); 
-            fill(255);
-            textAlign(LEFT, CENTER);
-            text(name, hx + 20, hy - 10);
+        for (let toId in graphData[fromId]) {
+            let toC = coordData[toId];
+            if (!toC) continue;
+            let x2 = map(toC[0], mapBounds.minLon, mapBounds.maxLon, 0, width);
+            let y2 = map(toC[1], mapBounds.maxLat, mapBounds.minLat, 0, height);
+            
+            // 預設灰色，如果是最終路徑畫寶藍色
+            let isPath = false;
+            if (appState === 'RESULT' || (appState === 'PLAYBACK' && snapshots[animIndex]?.isFinished)) {
+                for (let i = 0; i < currentPath.length - 1; i++) {
+                    if ((currentPath[i] == fromId && currentPath[i+1] == toId) || (currentPath[i] == toId && currentPath[i+1] == fromId)) {
+                        isPath = true; break;
+                    }
+                }
+            }
+            
+            stroke(isPath ? color(65, 105, 225) : color(60, 60, 60));
+            if(isPath) strokeWeight(4 / zoom); else strokeWeight(1 / zoom);
+            line(x1, y1, x2, y2);
         }
     }
 }
 
-// 滑鼠互動事件
-function mouseMoved() {
-    let minLon = 121.530, maxLon = 121.550;
-    let minLat = 25.008, maxLat = 25.025;
+function drawNodesAndState() {
+    let activeSnapshot = (appState === 'PLAYBACK' || appState === 'RESULT') && snapshots.length > 0 ? snapshots[animIndex] : null;
+
+    for (let id in coordData) {
+        let [lon, lat] = coordData[id];
+        let x = map(lon, mapBounds.minLon, mapBounds.maxLon, 0, width);
+        let y = map(lat, mapBounds.maxLat, mapBounds.minLat, 0, height); 
+
+        // 依據規格決定節點顏色與大小
+        // 🌟 優化：將節點整體縮小，防止覆蓋地圖
+        let nColor = color(90, 90, 90, 150); // 預設灰點：更小，帶透明度
+        let nSize = 1.5; // (原為 4)
+        let showDist = false;
+        let distVal = "";
+
+        if (activeSnapshot) {
+            if (activeSnapshot.visitedNodes && activeSnapshot.visitedNodes.includes(id)) {
+                // 🌟 優化：綠點顯著縮小 (原為 8)，並增加透明度，讓道路透出來
+                nColor = color(0, 200, 100, 180); 
+                nSize = 3; 
+                if (activeSnapshot.currentDistances[id] !== undefined && activeSnapshot.currentDistances[id] !== null) {
+                    showDist = true;
+                    distVal = activeSnapshot.currentDistances[id];
+                }
+            }
+            if (activeSnapshot.currentNode == id) {
+                nColor = color(255, 255, 0); // 黃點：正在拜訪
+                nSize = 6; // (原為 12)
+            }
+        }
+
+        // 起終點強制覆蓋顏色，也稍微縮小一點，保持顯眼但不突兀
+        if (id == currentStartId) { nColor = color(65, 105, 225); nSize = 8; } // (原為 14)
+        if (id == currentEndId) { nColor = color(255, 50, 50); nSize = 8; } // (原為 14)
+
+        noStroke();
+        fill(nColor);
+        circle(x, y, nSize);
+
+        // 畫文字距離
+        if (showDist && zoom > 3) { // 🌟 縮放更大時才顯示文字
+            fill(255); textSize(9 / zoom); textAlign(CENTER, BOTTOM);
+            text(Math.round(distVal), x, y - nSize);
+        }
+    }
+}
+
+function drawHoverTooltip() {
+    // 將實際滑鼠座標轉換回畫布世界座標
+    let worldX = (mouseX - offsetX) / zoom + width/2;
+    let worldY = (mouseY - offsetY) / zoom + height/2;
+
     let closestId = null;
-    let minDist = Infinity;
+    let minDist = 8 / zoom; // 🌟 優化：隨著節點縮小，縮小 Hover 判定範圍 (原為 15)
 
     for (let id in locationData) {
         let [lon, lat] = coordData[id];
-        let px = map(lon, minLon, maxLon, 0, width);
-        let py = map(lat, maxLat, minLat, 0, height);
-        let d = dist(mouseX, mouseY, px, py);
-        
-        if (d < 15 && d < minDist) { 
-            minDist = d;
+        let px = map(lon, mapBounds.minLon, mapBounds.maxLon, 0, width);
+        let py = map(lat, mapBounds.maxLat, mapBounds.minLat, 0, height);
+        if (dist(worldX, worldY, px, py) < minDist) { 
+            minDist = dist(worldX, worldY, px, py);
             closestId = id;
         }
     }
-    mapHoveredNodeId = closestId;
+
+    if (closestId && locationData[closestId]) {
+        let name = locationData[closestId];
+        push();
+        textSize(14);
+        let tw = textWidth(name);
+        fill(0, 240); noStroke(); // Tooltip 背景更深一點，更清晰
+        rect(mouseX + 10, mouseY - 25, tw + 20, 30, 5); 
+        fill(255); textAlign(LEFT, CENTER);
+        text(name, mouseX + 20, mouseY - 10);
+        pop();
+    }
+}
+
+// ==========================================
+// 畫布互動事件 (Pan, Zoom, 點擊節點/邊)
+// ==========================================
+function mouseWheel(event) {
+    let zoomAmount = event.delta > 0 ? 0.9 : 1.1;
+    let newZoom = zoom * zoomAmount;
+    newZoom = constrain(newZoom, 0.5, 15); // 🌟 限制縮放範圍，允許放得更大
+
+    // 以滑鼠為中心縮放的數學公式
+    offsetX = mouseX - (mouseX - offsetX) * (newZoom / zoom);
+    offsetY = mouseY - (mouseY - offsetY) * (newZoom / zoom);
+    zoom = newZoom;
+    return false;
 }
 
 function mousePressed() {
-    if (mapHoveredNodeId && mouseX > 0 && mouseX < width && mouseY > 0 && mouseY < height) {
-        let name = locationData[mapHoveredNodeId];
-        
-        if (!currentStartId) {
-            currentStartId = mapHoveredNodeId;
-            document.getElementById('startSelected').innerText = name;
-        } else if (!currentEndId && mapHoveredNodeId !== currentStartId) {
-            currentEndId = mapHoveredNodeId;
-            document.getElementById('endSelected').innerText = name;
+    if (mouseX < 0 || mouseX > width || mouseY < 0 || mouseY > height) return;
+    if (appState === 'INTRO') return;
+
+    let worldX = (mouseX - offsetX) / zoom + width/2;
+    let worldY = (mouseY - offsetY) / zoom + height/2;
+
+    // 1. 檢查是否點擊到「地點節點」 (用來設定起終點)
+    let closestId = null;
+    let minDist = 8 / zoom; // 🌟 優化：隨著節點縮小，縮小點擊判定範圍 (原為 15)
+    for (let id in locationData) {
+        let [lon, lat] = coordData[id];
+        let px = map(lon, mapBounds.minLon, mapBounds.maxLon, 0, width);
+        let py = map(lat, mapBounds.maxLat, mapBounds.minLat, 0, height);
+        if (dist(worldX, worldY, px, py) < minDist) { closestId = id; break; }
+    }
+
+    if (closestId && appState === 'SELECT') {
+        if (mapClickMode === 'START') {
+            currentStartId = closestId;
+            document.getElementById('startSelected').innerText = locationData[closestId];
         } else {
-            currentStartId = mapHoveredNodeId;
-            currentEndId = null;
-            document.getElementById('startSelected').innerText = name;
-            document.getElementById('endSelected').innerText = "請選擇終點...";
+            currentEndId = closestId;
+            document.getElementById('endSelected').innerText = locationData[closestId];
+        }
+        checkReadyToSearch();
+        return;
+    }
+
+    // 2. 檢查是否點擊到「邊」 (用來修改權重)
+    if (appState === 'SELECT') {
+        for (let fromId in graphData) {
+            let [lon1, lat1] = coordData[fromId];
+            let x1 = map(lon1, mapBounds.minLon, mapBounds.maxLon, 0, width);
+            let y1 = map(lat1, mapBounds.maxLat, mapBounds.minLat, 0, height);
             
-            // 重置狀態，準備重新規劃
-            snapshots = []; 
-            currentPath = [];
-            isAnimating = false;
+            for (let toId in graphData[fromId]) {
+                let [lon2, lat2] = coordData[toId];
+                let x2 = map(lon2, mapBounds.minLon, mapBounds.maxLon, 0, width);
+                let y2 = map(lat2, mapBounds.maxLat, mapBounds.minLat, 0, height);
+                
+                if (distToSegment(worldX, worldY, x1, y1, x2, y2) < 4 / zoom) { // 🌟 判定稍微縮小一點
+                    let oldWeight = graphData[fromId][toId];
+                    let newWeight = prompt(`目前距離權重為: ${oldWeight}\n請輸入新的權重 (整數, ≤ 10^9):`, oldWeight);
+                    if (newWeight !== null && !isNaN(newWeight) && parseInt(newWeight) <= 1000000000) {
+                        graphData[fromId][toId] = parseInt(newWeight);
+                        alert('權重更新成功！演算法將採用新地圖進行計算。');
+                    }
+                    return;
+                }
+            }
         }
     }
+
+    // 3. 都沒點到，開始拖曳地圖
+    isDraggingMap = true;
+    dragStartX = mouseX - offsetX;
+    dragStartY = mouseY - offsetY;
+}
+
+function mouseDragged() {
+    if (isDraggingMap) {
+        offsetX = mouseX - dragStartX;
+        offsetY = mouseY - dragStartY;
+    }
+}
+
+function mouseReleased() { isDraggingMap = false; }
+
+function distToSegment(px, py, x1, y1, x2, y2) {
+    let l2 = dist(x1, y1, x2, y2) ** 2;
+    if (l2 == 0) return dist(px, py, x1, y1);
+    let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return dist(px, py, x1 + t * (x2 - x1), y1 + t * (y2 - y1));
 }
 
 function windowResized() {
@@ -200,80 +292,167 @@ function windowResized() {
     if (container) resizeCanvas(container.clientWidth, container.clientHeight);
 }
 
-window.preload = preload; window.setup = setup; window.draw = draw; window.windowResized = windowResized; window.mouseMoved = mouseMoved; window.mousePressed = mousePressed;
+// 暴露給全域
+window.preload = preload; window.setup = setup; window.draw = draw; 
+window.windowResized = windowResized; window.mouseWheel = mouseWheel; 
+window.mousePressed = mousePressed; window.mouseDragged = mouseDragged; window.mouseReleased = mouseReleased;
 
-// Dijkstra 演算法
-function calculateDijkstraSnapshots(startId, endId) {
-    let distInfo = {};
-    let prev = {};
-    let pq = []; 
-    let visited = new Set();
-    let resultSnapshots = [];
+// ==========================================
+// UI 與狀態機邏輯
+// ==========================================
+function initUI() {
+    // --- 介面切換 ---
+    document.getElementById('btn-start-using').onclick = () => {
+        document.getElementById('intro-screen').classList.add('hidden');
+        document.getElementById('main-sidebar').classList.remove('hidden');
+        appState = 'SELECT';
+    };
 
-    for (let id in coordData) distInfo[id] = Infinity;
-    distInfo[startId] = 0;
-    pq.push({ id: startId, d: 0 });
+    // --- Toggle 群組設定 ---
+    setupToggle('mode-auto', 'mode-manual', (isAuto) => {
+        playMode = isAuto ? 'AUTO' : 'MANUAL';
+    });
+    setupToggle('algo-dijkstra', 'algo-astar', (isD) => {
+        algo = isD ? 'DIJKSTRA' : 'ASTAR';
+    });
+    setupToggle('click-mode-start', 'click-mode-end', (isStart) => {
+        mapClickMode = isStart ? 'START' : 'END';
+    });
 
-    while (pq.length > 0) {
-        pq.sort((a, b) => a.d - b.d);
-        let current = pq.shift();
-        let currId = current.id;
+    // --- 下拉選單 ---
+    initCustomSelect();
 
-        if (visited.has(currId)) continue;
-        visited.add(currId);
+    // --- 主要控制按鈕 ---
+    document.getElementById('searchBtn').onclick = startPathfinding;
+    document.getElementById('btn-skip-to-end').onclick = skipToEnd;
+    document.getElementById('btn-reselect').onclick = goToSelection;
+    document.getElementById('btn-back-to-select').onclick = goToSelection;
+    document.getElementById('btn-try-again').onclick = startPathfinding;
 
-        resultSnapshots.push({
-            currentNode: currId,
-            visitedNodes: Array.from(visited),
-            frontierNodes: pq.map(n => n.id),
-            isFinished: currId === endId,
-            finalPath: null
-        });
-
-        if (currId === endId) {
-            let path = [];
-            let step = endId;
-            while (step) {
-                path.unshift(step);
-                step = prev[step];
-            }
-            resultSnapshots[resultSnapshots.length - 1].finalPath = path;
-            break;
-        }
-
-        let neighbors = graphData[currId] || {};
-        for (let toId in neighbors) {
-            if (visited.has(toId)) continue;
-            let c1 = coordData[currId];
-            let c2 = coordData[toId];
-            let actualDist = Math.sqrt(Math.pow(c1[0]-c2[0], 2) + Math.pow(c1[1]-c2[1], 2));
-            
-            let alt = distInfo[currId] + actualDist;
-            if (alt < distInfo[toId]) {
-                distInfo[toId] = alt;
-                prev[toId] = currId;
-                pq.push({ id: toId, d: alt });
-            }
-        }
-    }
-    return resultSnapshots;
+    // --- 播放器控制項 ---
+    document.getElementById('btn-play-pause').onclick = togglePlayPause;
+    document.getElementById('btn-step-m10').onclick = () => stepAnim(-10);
+    document.getElementById('btn-step-m1').onclick = () => stepAnim(-1);
+    document.getElementById('btn-step-p1').onclick = () => stepAnim(1);
+    document.getElementById('btn-step-p10').onclick = () => stepAnim(10);
 }
 
-// 客製化下拉選單
-function initCustomSelect() {
-    createSelectItems('startItems', 'startSelected', (id) => currentStartId = id);
-    createSelectItems('endItems', 'endSelected', (id) => currentEndId = id);
+function setupToggle(btn1Id, btn2Id, callback) {
+    const b1 = document.getElementById(btn1Id);
+    const b2 = document.getElementById(btn2Id);
+    b1.onclick = () => { b1.classList.add('active'); b2.classList.remove('active'); callback(true); };
+    b2.onclick = () => { b2.classList.add('active'); b1.classList.remove('active'); callback(false); };
+}
 
-    document.getElementById('startSelected').addEventListener('click', function(e) {
-        e.stopPropagation();
-        closeAllSelect(this);
+function checkReadyToSearch() {
+    const btn = document.getElementById('searchBtn');
+    if (currentStartId && currentEndId) btn.classList.remove('disabled');
+    else btn.classList.add('disabled');
+}
+
+function startPathfinding() {
+    if (!currentStartId || !currentEndId) return;
+
+    try {
+        const pf = new PathFinder(graphData, coordData);
+        snapshots = pf.runPathfinding(currentStartId, currentEndId, algo);
+        
+        animIndex = 0;
+        appState = 'PLAYBACK';
+        
+        document.getElementById('selection-panel').classList.add('hidden');
+        document.getElementById('result-panel').classList.add('hidden');
+        document.getElementById('playback-panel').classList.remove('hidden');
+
+        if (playMode === 'AUTO') {
+            isPlaying = true;
+            document.getElementById('btn-play-pause').innerText = '⏸️ 暫停';
+            document.getElementById('btn-play-pause').classList.remove('hidden');
+        } else {
+            isPlaying = false;
+            document.getElementById('btn-play-pause').classList.add('hidden');
+        }
+        updatePlaybackControls();
+        
+    } catch (e) {
+        console.error("演算法執行失敗", e);
+        alert("演算法執行發生錯誤，請按 F12 檢查 Console！");
+    }
+}
+
+// --- 播放控制邏輯 ---
+function togglePlayPause() {
+    isPlaying = !isPlaying;
+    document.getElementById('btn-play-pause').innerText = isPlaying ? '⏸️ 暫停' : '▶️ 播放';
+}
+
+function updatePlaybackControls() {
+    // 解除封印！無論是否在播放，快進/快退按鈕永遠保持可點擊狀態
+    document.getElementById('btn-step-m10').disabled = false;
+    document.getElementById('btn-step-m1').disabled = false;
+    document.getElementById('btn-step-p1').disabled = false;
+    document.getElementById('btn-step-p10').disabled = false;
+
+    document.getElementById('playback-status').innerText = `目前步數: ${animIndex + 1} / ${snapshots.length}`;
+}
+
+function stepAnim(offset) {
+    let newIndex = animIndex + offset;
+    if (newIndex < 0) newIndex = 0;
+    
+    // 如果步數剛好等於最後一步，先停在最後一步不跳結果
+    if (newIndex >= snapshots.length - 1) {
+        if (animIndex === snapshots.length - 1 && offset > 0) {
+            handlePlaybackFinish();
+            return;
+        }
+        newIndex = snapshots.length - 1;
+    }
+    
+    animIndex = newIndex;
+    frameCounter = 0; // 手動快進/後退後，重置計時器，讓過渡更平滑
+    updatePlaybackControls();
+}
+
+function skipToEnd() {
+    animIndex = snapshots.length - 1;
+    handlePlaybackFinish();
+}
+
+function handlePlaybackFinish() {
+    appState = 'RESULT';
+    isPlaying = false;
+    currentPath = snapshots[snapshots.length - 1].finalPath || [];
+    
+    document.getElementById('playback-panel').classList.add('hidden');
+    document.getElementById('result-panel').classList.remove('hidden');
+    
+    let distStr = currentPath.length > 0 ? "計算完成" : "無法抵達";
+    document.getElementById('distanceOutput').innerText = `導航狀態：${distStr}`;
+}
+
+function goToSelection() {
+    appState = 'SELECT';
+    currentPath = [];
+    snapshots = [];
+    document.getElementById('playback-panel').classList.add('hidden');
+    document.getElementById('result-panel').classList.add('hidden');
+    document.getElementById('selection-panel').classList.remove('hidden');
+}
+
+// --- 下拉選單邏輯 ---
+function initCustomSelect() {
+    createSelectItems('startItems', 'startSelected', (id) => { currentStartId = id; checkReadyToSearch(); });
+    createSelectItems('endItems', 'endSelected', (id) => { currentEndId = id; checkReadyToSearch(); });
+
+    document.getElementById('startSelected').onclick = function(e) {
+        e.stopPropagation(); closeAllSelect(this);
         document.getElementById('startItems').classList.toggle('select-hide');
-    });
-    document.getElementById('endSelected').addEventListener('click', function(e) {
-        e.stopPropagation();
-        closeAllSelect(this);
+    };
+    document.getElementById('endSelected').onclick = function(e) {
+        e.stopPropagation(); closeAllSelect(this);
         document.getElementById('endItems').classList.toggle('select-hide');
-    });
+    };
     document.addEventListener('click', closeAllSelect);
 }
 
@@ -282,15 +461,11 @@ function createSelectItems(containerId, selectedId, onSelectCallback) {
     for (let id in locationData) {
         let div = document.createElement('div');
         div.innerHTML = locationData[id];
-        
-        div.addEventListener('mouseenter', () => listHoveredNodeId = id);
-        div.addEventListener('mouseleave', () => listHoveredNodeId = null);
-
-        div.addEventListener('click', function() {
+        div.onclick = function() {
             document.getElementById(selectedId).innerHTML = this.innerHTML;
             onSelectCallback(id);
             closeAllSelect();
-        });
+        };
         container.appendChild(div);
     }
 }
@@ -300,39 +475,3 @@ function closeAllSelect(except) {
         if (el.previousElementSibling !== except) el.classList.add('select-hide');
     });
 }
-
-// 按鈕執行邏輯
-window.onload = () => {
-  const searchBtn = document.getElementById('searchBtn');
-  
-  searchBtn.addEventListener('click', () => {
-    if (!currentStartId || !currentEndId) {
-      document.getElementById('pathOutput').innerHTML = '<span style="color: #ff4444;">⚠️ 錯誤：請先選擇起點與終點！</span>';
-      return;
-    }
-
-    // 清除舊的軌跡
-    currentPath = [];
-    
-    const startName = locationData[currentStartId];
-    const endName = locationData[currentEndId];
-
-    document.getElementById('pathOutput').innerHTML = '<span style="color: #ffff00;">📡 Dijkstra 演算法計算中...</span>';
-    
-    snapshots = calculateDijkstraSnapshots(currentStartId, currentEndId);
-    
-    animIndex = 0;
-    isAnimating = true;
-
-    document.getElementById('distanceOutput').innerText = `總距離：計算完成`;
-    document.getElementById('pathOutput').innerHTML = `
-      開始導航 (Dijkstra 擴散尋路)<br>
-      ----------------------<br>
-      🚶‍♂️ 出發：${startName}<br>
-      🌊 演算法波紋擴散中...<br>
-      🏁 抵達：${endName}<br>
-      ----------------------<br>
-      ✨ 動畫展示中...
-    `;
-  });
-};
