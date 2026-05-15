@@ -1,6 +1,10 @@
 import { PathFinder } from './pathfinding.js'; 
 
-let coordData, graphData, locationData;
+// 🌟 完美融合 PM 的寫法：使用 ES Module 載入，並確保變數名稱是你原本畫圖用的名稱！
+// ⚠️ 注意：請務必確認這三個 JSON 檔案已經被移動到了 src/assets/ 資料夾底下！
+import coordData from './assets/coordinates.json' with { type: 'json' };
+import graphData from './assets/graph.json' with { type: 'json' };
+import locationData from './assets/locations.json' with { type: 'json' };
 
 // --- 系統狀態管理 ---
 let appState = 'INTRO'; // INTRO, SELECT, PLAYBACK, RESULT
@@ -17,7 +21,6 @@ let animIndex = 0;
 
 // --- 播放器狀態 ---
 let isPlaying = false;
-// 速度維持較快設定
 let autoPlaySpeed = 2; 
 let frameCounter = 0;
 
@@ -29,14 +32,9 @@ let isDraggingMap = false;
 let dragStartX = 0;
 let dragStartY = 0;
 
-// 預先計算好的地圖邊界映射 (為了效能)
 const mapBounds = { minLon: 121.530, maxLon: 121.550, minLat: 25.008, maxLat: 25.025 };
 
-function preload() {
-  coordData = loadJSON('/coordinates.json');
-  graphData = loadJSON('/graph.json');
-  locationData = loadJSON('/locations.json');
-}
+// 🗑️ (原本這裡的 function preload() 已經被刪除了，因為我們改用上面的 import)
 
 function setup() {
   let container = document.getElementById('canvas-container');
@@ -49,6 +47,8 @@ function setup() {
   
   initUI();
 }
+
+// ... 下面的 draw() 跟其他功能完全保持不變！
 
 function draw() {
     background(18); 
