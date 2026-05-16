@@ -1,10 +1,9 @@
 import { PathFinder } from './pathfinding.js'; 
 
-// 🌟 完美融合 PM 的寫法：使用 ES Module 載入，並確保變數名稱是你原本畫圖用的名稱！
-// ⚠️ 注意：請務必確認這三個 JSON 檔案已經被移動到了 src/assets/ 資料夾底下！
-import coordData from './assets/coordinates.json' with { type: 'json' };
-import graphData from './assets/graph.json' with { type: 'json' };
-import locationData from './assets/locations.json' with { type: 'json' };
+// 🌟 已修正：移除 with { type: 'json' }，使用 Vite 預設的安全讀取方式
+import coordData from './assets/coordinates.json';
+import graphData from './assets/graph.json';
+import locationData from './assets/locations.json';
 
 // --- 系統狀態管理 ---
 let appState = 'INTRO'; // INTRO, SELECT, PLAYBACK, RESULT
@@ -34,8 +33,6 @@ let dragStartY = 0;
 
 const mapBounds = { minLon: 121.530, maxLon: 121.550, minLat: 25.008, maxLat: 25.025 };
 
-// 🗑️ (原本這裡的 function preload() 已經被刪除了，因為我們改用上面的 import)
-
 function setup() {
   let container = document.getElementById('canvas-container');
   let canvas = createCanvas(container.clientWidth, container.clientHeight);
@@ -47,8 +44,6 @@ function setup() {
   
   initUI();
 }
-
-// ... 下面的 draw() 跟其他功能完全保持不變！
 
 function draw() {
     background(18); 
@@ -126,15 +121,13 @@ function drawNodesAndState() {
         let y = map(lat, mapBounds.maxLat, mapBounds.minLat, 0, height); 
 
         // 依據規格決定節點顏色與大小
-        // 🌟 優化：將節點整體縮小，防止覆蓋地圖
         let nColor = color(90, 90, 90, 150); // 預設灰點：更小，帶透明度
-        let nSize = 1.5; // (原為 4)
+        let nSize = 1.5; 
         let showDist = false;
         let distVal = "";
 
         if (activeSnapshot) {
             if (activeSnapshot.visitedNodes && activeSnapshot.visitedNodes.includes(id)) {
-                // 🌟 優化：綠點顯著縮小 (原為 8)，並增加透明度，讓道路透出來
                 nColor = color(0, 200, 100, 180); 
                 nSize = 3; 
                 if (activeSnapshot.currentDistances[id] !== undefined && activeSnapshot.currentDistances[id] !== null) {
@@ -144,20 +137,20 @@ function drawNodesAndState() {
             }
             if (activeSnapshot.currentNode == id) {
                 nColor = color(255, 255, 0); // 黃點：正在拜訪
-                nSize = 6; // (原為 12)
+                nSize = 6; 
             }
         }
 
-        // 起終點強制覆蓋顏色，也稍微縮小一點，保持顯眼但不突兀
-        if (id == currentStartId) { nColor = color(65, 105, 225); nSize = 8; } // (原為 14)
-        if (id == currentEndId) { nColor = color(255, 50, 50); nSize = 8; } // (原為 14)
+        // 起終點強制覆蓋顏色
+        if (id == currentStartId) { nColor = color(65, 105, 225); nSize = 8; } 
+        if (id == currentEndId) { nColor = color(255, 50, 50); nSize = 8; } 
 
         noStroke();
         fill(nColor);
         circle(x, y, nSize);
 
         // 畫文字距離
-        if (showDist && zoom > 3) { // 🌟 縮放更大時才顯示文字
+        if (showDist && zoom > 3) { 
             fill(255); textSize(9 / zoom); textAlign(CENTER, BOTTOM);
             text(Math.round(distVal), x, y - nSize);
         }
@@ -165,12 +158,11 @@ function drawNodesAndState() {
 }
 
 function drawHoverTooltip() {
-    // 將實際滑鼠座標轉換回畫布世界座標
     let worldX = (mouseX - offsetX) / zoom + width/2;
     let worldY = (mouseY - offsetY) / zoom + height/2;
 
     let closestId = null;
-    let minDist = 8 / zoom; // 🌟 優化：隨著節點縮小，縮小 Hover 判定範圍 (原為 15)
+    let minDist = 8 / zoom; 
 
     for (let id in locationData) {
         let [lon, lat] = coordData[id];
@@ -187,7 +179,7 @@ function drawHoverTooltip() {
         push();
         textSize(14);
         let tw = textWidth(name);
-        fill(0, 240); noStroke(); // Tooltip 背景更深一點，更清晰
+        fill(0, 240); noStroke(); 
         rect(mouseX + 10, mouseY - 25, tw + 20, 30, 5); 
         fill(255); textAlign(LEFT, CENTER);
         text(name, mouseX + 20, mouseY - 10);
@@ -201,9 +193,8 @@ function drawHoverTooltip() {
 function mouseWheel(event) {
     let zoomAmount = event.delta > 0 ? 0.9 : 1.1;
     let newZoom = zoom * zoomAmount;
-    newZoom = constrain(newZoom, 0.5, 15); // 🌟 限制縮放範圍，允許放得更大
+    newZoom = constrain(newZoom, 0.5, 15); 
 
-    // 以滑鼠為中心縮放的數學公式
     offsetX = mouseX - (mouseX - offsetX) * (newZoom / zoom);
     offsetY = mouseY - (mouseY - offsetY) * (newZoom / zoom);
     zoom = newZoom;
@@ -217,9 +208,8 @@ function mousePressed() {
     let worldX = (mouseX - offsetX) / zoom + width/2;
     let worldY = (mouseY - offsetY) / zoom + height/2;
 
-    // 1. 檢查是否點擊到「地點節點」 (用來設定起終點)
     let closestId = null;
-    let minDist = 8 / zoom; // 🌟 優化：隨著節點縮小，縮小點擊判定範圍 (原為 15)
+    let minDist = 8 / zoom; 
     for (let id in locationData) {
         let [lon, lat] = coordData[id];
         let px = map(lon, mapBounds.minLon, mapBounds.maxLon, 0, width);
@@ -239,7 +229,6 @@ function mousePressed() {
         return;
     }
 
-    // 2. 檢查是否點擊到「邊」 (用來修改權重)
     if (appState === 'SELECT') {
         for (let fromId in graphData) {
             let [lon1, lat1] = coordData[fromId];
@@ -251,7 +240,7 @@ function mousePressed() {
                 let x2 = map(lon2, mapBounds.minLon, mapBounds.maxLon, 0, width);
                 let y2 = map(lat2, mapBounds.maxLat, mapBounds.minLat, 0, height);
                 
-                if (distToSegment(worldX, worldY, x1, y1, x2, y2) < 4 / zoom) { // 🌟 判定稍微縮小一點
+                if (distToSegment(worldX, worldY, x1, y1, x2, y2) < 4 / zoom) { 
                     let oldWeight = graphData[fromId][toId];
                     let newWeight = prompt(`目前距離權重為: ${oldWeight}\n請輸入新的權重 (整數, ≤ 10^9):`, oldWeight);
                     if (newWeight !== null && !isNaN(newWeight) && parseInt(newWeight) <= 1000000000) {
@@ -264,7 +253,6 @@ function mousePressed() {
         }
     }
 
-    // 3. 都沒點到，開始拖曳地圖
     isDraggingMap = true;
     dragStartX = mouseX - offsetX;
     dragStartY = mouseY - offsetY;
@@ -292,8 +280,8 @@ function windowResized() {
     if (container) resizeCanvas(container.clientWidth, container.clientHeight);
 }
 
-// 暴露給全域
-window.preload = preload; window.setup = setup; window.draw = draw; 
+// 🌟 已修正：拿掉了 window.preload，防止 JavaScript 報錯崩潰
+window.setup = setup; window.draw = draw; 
 window.windowResized = windowResized; window.mouseWheel = mouseWheel; 
 window.mousePressed = mousePressed; window.mouseDragged = mouseDragged; window.mouseReleased = mouseReleased;
 
@@ -301,14 +289,12 @@ window.mousePressed = mousePressed; window.mouseDragged = mouseDragged; window.m
 // UI 與狀態機邏輯
 // ==========================================
 function initUI() {
-    // --- 介面切換 ---
     document.getElementById('btn-start-using').onclick = () => {
         document.getElementById('intro-screen').classList.add('hidden');
         document.getElementById('main-sidebar').classList.remove('hidden');
         appState = 'SELECT';
     };
 
-    // --- Toggle 群組設定 ---
     setupToggle('mode-auto', 'mode-manual', (isAuto) => {
         playMode = isAuto ? 'AUTO' : 'MANUAL';
     });
@@ -319,17 +305,14 @@ function initUI() {
         mapClickMode = isStart ? 'START' : 'END';
     });
 
-    // --- 下拉選單 ---
     initCustomSelect();
 
-    // --- 主要控制按鈕 ---
     document.getElementById('searchBtn').onclick = startPathfinding;
     document.getElementById('btn-skip-to-end').onclick = skipToEnd;
     document.getElementById('btn-reselect').onclick = goToSelection;
     document.getElementById('btn-back-to-select').onclick = goToSelection;
     document.getElementById('btn-try-again').onclick = startPathfinding;
 
-    // --- 播放器控制項 ---
     document.getElementById('btn-play-pause').onclick = togglePlayPause;
     document.getElementById('btn-step-m10').onclick = () => stepAnim(-10);
     document.getElementById('btn-step-m1').onclick = () => stepAnim(-1);
@@ -380,14 +363,12 @@ function startPathfinding() {
     }
 }
 
-// --- 播放控制邏輯 ---
 function togglePlayPause() {
     isPlaying = !isPlaying;
     document.getElementById('btn-play-pause').innerText = isPlaying ? '⏸️ 暫停' : '▶️ 播放';
 }
 
 function updatePlaybackControls() {
-    // 解除封印！無論是否在播放，快進/快退按鈕永遠保持可點擊狀態
     document.getElementById('btn-step-m10').disabled = false;
     document.getElementById('btn-step-m1').disabled = false;
     document.getElementById('btn-step-p1').disabled = false;
@@ -400,7 +381,6 @@ function stepAnim(offset) {
     let newIndex = animIndex + offset;
     if (newIndex < 0) newIndex = 0;
     
-    // 如果步數剛好等於最後一步，先停在最後一步不跳結果
     if (newIndex >= snapshots.length - 1) {
         if (animIndex === snapshots.length - 1 && offset > 0) {
             handlePlaybackFinish();
@@ -410,7 +390,7 @@ function stepAnim(offset) {
     }
     
     animIndex = newIndex;
-    frameCounter = 0; // 手動快進/後退後，重置計時器，讓過渡更平滑
+    frameCounter = 0; 
     updatePlaybackControls();
 }
 
@@ -440,7 +420,6 @@ function goToSelection() {
     document.getElementById('selection-panel').classList.remove('hidden');
 }
 
-// --- 下拉選單邏輯 ---
 function initCustomSelect() {
     createSelectItems('startItems', 'startSelected', (id) => { currentStartId = id; checkReadyToSearch(); });
     createSelectItems('endItems', 'endSelected', (id) => { currentEndId = id; checkReadyToSearch(); });
