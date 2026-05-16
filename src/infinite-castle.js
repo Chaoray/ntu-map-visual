@@ -1,9 +1,4 @@
-// src/infinite-castle.js
-
 const infiniteCastleSketch = (p) => {
-    // ==========================================
-    // 🛠️ 資源檔名設定區
-    // ==========================================
     const DOG_IMG_PATH = '/dog.jpg';     
     const BOSS_IMG_PATH = '/muzan.webp';   
     const MUSHROOM_IMG_PATH = '/tung.png'; 
@@ -13,9 +8,6 @@ const infiniteCastleSketch = (p) => {
     const WIN_SFX_PATH = '/dog_win.mp3';      
     const TUNG_SFX_PATH = '/tung_tung.mp3';   
 
-    // ==========================================
-    // 系統狀態與全域變數
-    // ==========================================
     let gameState = 'INTRO_WAIT'; 
     let editMode = 'MOVE'; 
 
@@ -49,12 +41,9 @@ const infiniteCastleSketch = (p) => {
         highlight: '#ffd700', path: '#800080', text: '#e0e0e0', 
         panelBg: 'rgba(20, 10, 10, 0.85)', boxBg: '#ffffff', 
         boxBorder: '#000000', boxText: '#000000', labelText: '#aaaaaa',
-        newUpdate: '#ff0000' // 🌟 新增紅色：表示剛被更新的數值
+        newUpdate: '#ff0000'
     };
 
-    // ==========================================
-    // p5.js 生命週期
-    // ==========================================
     p.preload = () => {
         dogImg = p.loadImage(DOG_IMG_PATH, () => {}, () => {});
         muzanImg = p.loadImage(BOSS_IMG_PATH, () => {}, () => {});
@@ -105,9 +94,6 @@ const infiniteCastleSketch = (p) => {
         }
     };
 
-    // ==========================================
-    // 初始化與 UI
-    // ==========================================
     function initDefaultGraph() {
         nodes = [];
         edges = [];
@@ -122,7 +108,7 @@ const infiniteCastleSketch = (p) => {
             cost: Infinity, 
             prev: null, 
             locked: false,
-            isNewlyUpdated: false // 🌟 追蹤是否剛被更新
+            isNewlyUpdated: false
         });
     }
 
@@ -130,7 +116,6 @@ const infiniteCastleSketch = (p) => {
         let container = document.getElementById('infinite-castle-container');
         container.style.position = 'relative'; 
 
-        // 1. 開場按鈕
         startBtn = p.createButton('開始墜落');
         startBtn.parent(container);
         startBtn.style('position', 'absolute');
@@ -155,7 +140,6 @@ const infiniteCastleSketch = (p) => {
             doorOpenProgress = p.width; 
         });
 
-        // 2. 工具列
         toolbar = p.createDiv();
         toolbar.parent(container);
         toolbar.style('position', 'absolute');
@@ -224,7 +208,6 @@ const infiniteCastleSketch = (p) => {
             initDefaultGraph(); 
         });
 
-        // 3. 演算法控制
         let controlWrapper = p.createDiv();
         controlWrapper.parent(container);
         controlWrapper.style('position', 'absolute');
@@ -255,9 +238,6 @@ const infiniteCastleSketch = (p) => {
         resetBtn.mousePressed(resetToEditor);
     }
 
-    // ==========================================
-    // 繪圖邏輯
-    // ==========================================
     function drawIntroScene() {
         p.push();
         let doorW = 300;
@@ -395,15 +375,13 @@ const infiniteCastleSketch = (p) => {
                 p.noStroke();
                 p.textSize(14); p.textStyle(p.BOLD);
                 
-                // 🌟 判斷是否要用紅色顯示 (剛被更新)
                 let costTextColor = n.isNewlyUpdated ? COLORS.newUpdate : COLORS.boxText;
                 
                 let costText = n.cost === Infinity ? '∞' : n.cost;
-                p.fill(costTextColor); // 使用決定好的顏色
+                p.fill(costTextColor); 
                 p.text(costText, n.x - boxW, boxY); 
                 
-                // 鎖頭圖示
-                p.fill(COLORS.boxText); // 恢復預設黑色給鎖頭
+                p.fill(COLORS.boxText); 
                 p.text(n.locked ? '🔒' : ' ', n.x, boxY); 
                 
                 let prevLabel = '-';
@@ -413,7 +391,6 @@ const infiniteCastleSketch = (p) => {
                     if(prevNode.isStart) prevLabel = 'S';
                 }
                 
-                // 🌟 來源也跟著變紅，更清楚
                 p.fill(costTextColor); 
                 p.text(prevLabel, n.x + boxW, boxY); 
                 p.textStyle(p.NORMAL);
@@ -453,9 +430,6 @@ const infiniteCastleSketch = (p) => {
         p.pop();
     }
 
-    // ==========================================
-    // 互動邏輯
-    // ==========================================
     p.mousePressed = () => {
         let containerView = document.getElementById('infinite-castle-view');
         if (containerView && containerView.classList.contains('hidden')) return;
@@ -528,9 +502,6 @@ const infiniteCastleSketch = (p) => {
         return p.dist(px, py, x1 + t * (x2 - x1), y1 + t * (y2 - y1));
     }
 
-    // ==========================================
-    // Dijkstra
-    // ==========================================
     function startDijkstra() {
         let hasStart = nodes.find(n => n.isStart);
         if (!hasStart) {
@@ -548,7 +519,6 @@ const infiniteCastleSketch = (p) => {
             gameState = 'ANIMATE_DOG'; dogPathIndex = 0; dogAnimProgress = 0; nextStepBtn.hide(); return;
         }
 
-        // 🌟 進入新步驟前，清除所有紅字標記
         nodes.forEach(n => n.isNewlyUpdated = false);
 
         if (currentStep === 1) {
@@ -578,7 +548,7 @@ const infiniteCastleSketch = (p) => {
                     if (newCost < nNode.cost) { 
                         nNode.cost = newCost; 
                         nNode.prev = currentNodeId; 
-                        nNode.isNewlyUpdated = true; // 🌟 標記這個節點剛剛被更新了，讓畫圖時顯示紅字
+                        nNode.isNewlyUpdated = true; 
                     }
                 }
             });
