@@ -11,25 +11,21 @@
       body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; background-color: #121212; color: white;}
       .hidden { display: none !important; }
       
-      /* 頂部導覽列 */
       #top-nav { background-color: #1a1a1a; padding: 10px; text-align: center; border-bottom: 2px solid #444; }
       #top-nav button { background-color: #333; color: white; border: 1px solid #666; padding: 8px 16px; margin: 0 10px; cursor: pointer; border-radius: 4px; font-size: 16px; }
       #top-nav button:hover { background-color: #555; }
       #top-nav button.active { background-color: #ff8c00; color: black; font-weight: bold; }
       
-      /* 主要版面 */
       .content-wrapper { display: flex; flex: 1; overflow: hidden; }
       .sidebar { width: 320px; padding: 20px; background-color: #222; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 15px;}
       #canvas-container { flex: 1; position: relative; overflow: hidden; cursor: grab;}
       #canvas-container:active { cursor: grabbing; }
       #infinite-castle-container { flex: 1; display: flex; align-items: center; justify-content: center; background-color: #000; overflow: hidden; }
 
-      /* 覆蓋層：開始介面 */
       .overlay-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px); transition: opacity 0.3s;}
       .huge-btn { font-size: 24px; padding: 15px 40px; background: #00ffaa; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;}
       .huge-btn:hover { transform: scale(1.05); background: #00cc88;}
 
-      /* 按鈕與切換群組 */
       .toggle-group { display: flex; gap: 5px; background: #111; padding: 5px; border-radius: 6px;}
       .toggle-btn { flex: 1; padding: 8px; background: transparent; border: none; color: #888; cursor: pointer; border-radius: 4px; font-size: 0.9rem;}
       .toggle-btn.active { background: #444; color: #fff; font-weight: bold;}
@@ -42,7 +38,6 @@
       .secondary-btn { background: #444; color: #fff; }
       .secondary-btn:hover { background: #666; }
 
-      /* 播放控制區 */
       .playback-controls { background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 15px;}
       .step-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;}
       .ctrl-btn { padding: 8px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; cursor: pointer;}
@@ -107,6 +102,8 @@
             </div>
           </div>
           <button id="searchBtn" class="primary-btn disabled">開始巡路</button>
+          
+          <button id="btn-reset-weights" class="secondary-btn" style="margin-top:10px;">🔄 恢復預設地圖權重</button>
         </div>
 
         <div id="playback-panel" class="hidden">

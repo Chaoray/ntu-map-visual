@@ -1,6 +1,5 @@
 import { PathFinder } from './pathfinding.js'; 
 
-// 🌟 安全的 JSON 載入方式
 import coordData from './assets/coordinates.json';
 import graphData from './assets/graph.json';
 import locationData from './assets/locations.json';
@@ -17,6 +16,10 @@ let currentEndId = null;
 let currentPath = [];
 let snapshots = [];
 let animIndex = 0;
+
+let modifiedEdges = new Set(); 
+// 🌟 新增：用來儲存乾淨原始地圖的拷貝
+let originalGraphData = null;
 
 // --- 播放器狀態 ---
 let isPlaying = false;
@@ -40,6 +43,9 @@ function setup() {
   
   offsetX = width / 2;
   offsetY = height / 2;
+  
+  // 🌟 初始化時，深層拷貝一份乾淨的原始地圖資料
+  originalGraphData = JSON.parse(JSON.stringify(graphData));
   
   initUI();
 }
@@ -65,15 +71,20 @@ function draw() {
     scale(zoom);
     translate(-width/2, -height/2);
 
-    drawEdges();
-    drawNodesAndState();
+    let padding = 100 / zoom; 
+    let viewLeft = (-offsetX) / zoom + width / 2 - padding;
+    let viewRight = (width - offsetX) / zoom + width / 2 + padding;
+    let viewTop = (-offsetY) / zoom + height / 2 - padding;
+    let viewBottom = (height - offsetY) / zoom + height / 2 + padding;
+
+    drawEdges(viewLeft, viewRight, viewTop, viewBottom);
+    drawNodesAndState(viewLeft, viewRight, viewTop, viewBottom);
 
     pop();
     drawHoverTooltip();
 }
 
-function drawEdges() {
-    strokeWeight(1.5 / zoom); 
+function drawEdges(vLeft, vRight, vTop, vBottom) {
     for (let fromId in graphData) {
         let fromC = coordData[fromId];
         if (!fromC) continue;
@@ -86,6 +97,11 @@ function drawEdges() {
             let x2 = map(toC[0], mapBounds.minLon, mapBounds.maxLon, 0, width);
             let y2 = map(toC[1], mapBounds.maxLat, mapBounds.minLat, 0, height);
             
+            if (Math.max(x1, x2) < vLeft || Math.min(x1, x2) > vRight || 
+                Math.max(y1, y2) < vTop || Math.min(y1, y2) > vBottom) {
+                continue; 
+            }
+
             let isPath = false;
             if (appState === 'RESULT' || (appState === 'PLAYBACK' && snapshots[animIndex]?.isFinished)) {
                 for (let i = 0; i < currentPath.length - 1; i++) {
@@ -95,20 +111,51 @@ function drawEdges() {
                 }
             }
             
-            stroke(isPath ? color(65, 105, 225) : color(60, 60, 60));
-            if(isPath) strokeWeight(4 / zoom); else strokeWeight(1 / zoom);
+            let edgeKey1 = `${fromId}-${toId}`;
+            let edgeKey2 = `${toId}-${fromId}`;
+            let isModified = modifiedEdges.has(edgeKey1) || modifiedEdges.has(edgeKey2);
+
+            if (isPath) {
+                stroke(color(65, 105, 225)); 
+                strokeWeight(4 / zoom);
+            } else if (isModified) {
+                stroke(color(255, 165, 0)); 
+                strokeWeight(3 / zoom);     
+            } else {
+                stroke(color(60, 60, 60));  
+                strokeWeight(1 / zoom);
+            }
+            
             line(x1, y1, x2, y2);
+
+            if (zoom > 4 || isModified) {
+                push();
+                fill(isModified ? color(255, 165, 0) : color(180, 180, 180));
+                noStroke();
+                textSize((isModified ? 14 : 10) / zoom); 
+                textAlign(CENTER, CENTER);
+                
+                let rawWeight = graphData[fromId][toId];
+                let displayWeight = Math.round(rawWeight * 10) / 10;
+                
+                text(displayWeight, (x1 + x2) / 2, (y1 + y2) / 2 - (3 / zoom));
+                pop();
+            }
         }
     }
 }
 
-function drawNodesAndState() {
+function drawNodesAndState(vLeft, vRight, vTop, vBottom) {
     let activeSnapshot = (appState === 'PLAYBACK' || appState === 'RESULT') && snapshots.length > 0 ? snapshots[animIndex] : null;
 
     for (let id in coordData) {
         let [lon, lat] = coordData[id];
         let x = map(lon, mapBounds.minLon, mapBounds.maxLon, 0, width);
         let y = map(lat, mapBounds.maxLat, mapBounds.minLat, 0, height); 
+
+        if (x < vLeft || x > vRight || y < vTop || y > vBottom) {
+            continue;
+        }
 
         let nColor = color(90, 90, 90, 150); 
         let nSize = 1.5; 
@@ -139,7 +186,8 @@ function drawNodesAndState() {
 
         if (showDist && zoom > 3) { 
             fill(255); textSize(9 / zoom); textAlign(CENTER, BOTTOM);
-            text(Math.round(distVal), x, y - nSize);
+            let displayDist = Math.round(distVal * 10) / 10;
+            text(displayDist, x, y - nSize);
         }
     }
 }
@@ -225,11 +273,18 @@ function mousePressed() {
                 let y2 = map(lat2, mapBounds.maxLat, mapBounds.minLat, 0, height);
                 
                 if (distToSegment(worldX, worldY, x1, y1, x2, y2) < 4 / zoom) { 
-                    let oldWeight = graphData[fromId][toId];
-                    let newWeight = prompt(`目前距離權重為: ${oldWeight}\n請輸入新的權重 (整數, ≤ 10^9):`, oldWeight);
-                    if (newWeight !== null && !isNaN(newWeight) && parseInt(newWeight) <= 1000000000) {
-                        graphData[fromId][toId] = parseInt(newWeight);
-                        alert('權重更新成功！演算法將採用新地圖進行計算。');
+                    let oldWeight = Math.round(graphData[fromId][toId] * 10) / 10;
+                    let newWeight = prompt(`目前距離權重為: ${oldWeight}\n請輸入新的權重 (整數或小數, ≤ 10^9):`, oldWeight);
+                    
+                    if (newWeight !== null && !isNaN(newWeight) && parseFloat(newWeight) <= 1000000000) {
+                        let w = parseFloat(newWeight); 
+                        graphData[fromId][toId] = w;
+                        modifiedEdges.add(`${fromId}-${toId}`); 
+                        
+                        if (graphData[toId] && graphData[toId][fromId] !== undefined) {
+                            graphData[toId][fromId] = w;
+                            modifiedEdges.add(`${toId}-${fromId}`); 
+                        }
                     }
                     return;
                 }
@@ -298,6 +353,28 @@ function initUI() {
     document.getElementById('btn-step-m1').onclick = () => stepAnim(-1);
     document.getElementById('btn-step-p1').onclick = () => stepAnim(1);
     document.getElementById('btn-step-p10').onclick = () => stepAnim(10);
+
+    // 🌟 綁定還原權重按鈕的事件
+    document.getElementById('btn-reset-weights').onclick = resetWeights;
+}
+
+// 🌟 核心功能：一鍵還原所有權重
+function resetWeights() {
+    if (modifiedEdges.size === 0) {
+        alert('目前沒有修改過任何權重喔！');
+        return;
+    }
+    
+    // 將所有被改過的線，覆蓋回原始地圖的值
+    for (let fromId in graphData) {
+        for (let toId in graphData[fromId]) {
+            graphData[fromId][toId] = originalGraphData[fromId][toId];
+        }
+    }
+    
+    // 清空修改紀錄
+    modifiedEdges.clear();
+    alert('✅ 地圖權重已全部恢復為預設真實距離！');
 }
 
 function setupToggle(btn1Id, btn2Id, callback) {
@@ -384,11 +461,9 @@ function handlePlaybackFinish() {
     isPlaying = false;
     currentPath = snapshots[snapshots.length - 1].finalPath || [];
     
-    document.getElementById('playback-panel').classList.add('hidden');
-    document.getElementById('result-panel').classList.remove('hidden');
-    
-    let distStr = currentPath.length > 0 ? "計算完成" : "無法抵達";
-    document.getElementById('distanceOutput').innerText = `導航狀態：${distStr}`;
+    let finalDist = snapshots[snapshots.length - 1].currentDistances[currentEndId];
+    let distStr = currentPath.length > 0 ? `${Math.round(finalDist * 10) / 10} 公尺` : "無法抵達";
+    document.getElementById('distanceOutput').innerText = `總距離：${distStr}`;
 }
 
 function goToSelection() {
