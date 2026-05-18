@@ -60,7 +60,6 @@
 2. **啟動挑戰：** 設定好起點與終點後，點擊開始搜尋。
 3. **勝利通關：** 手動點擊 **下一步**，觀看 Dijkstra 的運行過程。如果有路徑可以到終點，則會顯示攻擊動畫，否則會是 **找不到目標** 的提示。
 
-## Development
 ### First time
 
 - To start development, run this command at the root folder of this project.
