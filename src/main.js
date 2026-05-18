@@ -321,11 +321,7 @@ window.windowResized = windowResized; window.mouseWheel = mouseWheel;
 window.mousePressed = mousePressed; window.mouseDragged = mouseDragged; window.mouseReleased = mouseReleased;
 
 function initUI() {
-    document.getElementById('btn-start-using').onclick = () => {
-        document.getElementById('intro-screen').classList.add('hidden');
-        document.getElementById('main-sidebar').classList.remove('hidden');
-        appState = 'SELECT';
-    };
+    appState = 'SELECT';
 
     setupToggle('mode-auto', 'mode-manual', (isAuto) => {
         playMode = isAuto ? 'AUTO' : 'MANUAL';
@@ -352,7 +348,6 @@ function initUI() {
     document.getElementById('btn-step-p100').onclick = () => stepAnim(100);
 
     // 🌟 綁定還原權重按鈕的事件
-    document.getElementById('btn-reset-weights').onclick = resetWeights;
 }
 
 // 🌟 核心功能：一鍵還原所有權重
