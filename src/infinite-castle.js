@@ -434,7 +434,6 @@ const infiniteCastleSketch = (p) => {
         p.text(msg, p.width - 320, 70, 280, 100);
         p.pop();
     }
-
     p.mousePressed = (event) => {
         let containerView = document.getElementById('infinite-castle-view');
         if (containerView && containerView.classList.contains('hidden')) return;
@@ -547,7 +546,7 @@ const infiniteCastleSketch = (p) => {
                 if (n.cost < minCost) { minCost = n.cost; minNodeId = id; }
             }
 
-            if (minNodeId === null) { alert("找不到無慘！路徑可能沒有連接。"); gameState = 'DIJKSTRA_DONE'; return; }
+            if (minNodeId === null) { alert("找不到無慘！路徑可能沒有連接。"); gameState = 'DIJKSTRA_NO_PATH'; return; }
 
             currentNodeId = minNodeId;
             let cNode = nodes.find(n => n.id === currentNodeId);
@@ -584,7 +583,7 @@ const infiniteCastleSketch = (p) => {
     }
 
     function animateDogMovement() {
-        if (dogPathIndex >= finalPath.length - 1) {
+        if (dogPathIndex >= finalPath.length - 1 && gameState !== 'DIJKSTRA_NO_PATH') {
             if (!hasPlayedWin) {
                 winSfx.play().catch(e=>{});
                 hasPlayedWin = true;

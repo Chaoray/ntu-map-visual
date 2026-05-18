@@ -4,109 +4,138 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>路徑規劃與演算法視覺化系統</title>
-    
+    <title>台大路徑規劃與演算法視覺化系統</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
     <style>
-      /* 新增：導覽列樣式 */
-      #top-nav {
-        background-color: #1a1a1a;
-        padding: 10px;
-        text-align: center;
-        border-bottom: 2px solid #444;
-      }
-      #top-nav button {
-        background-color: #333;
-        color: white;
-        border: 1px solid #666;
-        padding: 8px 16px;
-        margin: 0 10px;
-        cursor: pointer;
-        border-radius: 4px;
-        font-size: 16px;
-      }
-      #top-nav button:hover {
-        background-color: #555;
-      }
-      #top-nav button.active {
-        background-color: #ff8c00; /* 亮橘色表示選中 */
-        color: black;
-        font-weight: bold;
-      }
-      
-      /* 隱藏/顯示控制 */
-      .hidden {
-        display: none !important;
-      }
-      
-      /* 原本的容器樣式 (簡化示意，請保留你原本的 style.css) */
+      * { box-sizing: border-box; }
       body { margin: 0; display: flex; flex-direction: column; height: 100vh; font-family: sans-serif; background-color: #121212; color: white;}
+      .hidden { display: none !important; }
+      
+      #top-nav { background-color: #1a1a1a; padding: 10px; text-align: center; border-bottom: 2px solid #444; }
+      #top-nav button { background-color: #333; color: white; border: 1px solid #666; padding: 8px 16px; margin: 0 10px; cursor: pointer; border-radius: 4px; font-size: 16px; }
+      #top-nav button:hover { background-color: #555; }
+      #top-nav button.active { background-color: #ff8c00; color: black; font-weight: bold; }
+      
       .content-wrapper { display: flex; flex: 1; overflow: hidden; }
-      .sidebar { width: 300px; padding: 20px; background-color: #222; border-right: 1px solid #444; overflow-y: auto;}
-      #canvas-container { flex: 1; position: relative; }
+      .sidebar { width: 320px; padding: 20px; background-color: #222; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column; gap: 15px;}
+      #canvas-container { flex: 1; position: relative; overflow: hidden; cursor: grab;}
+      #canvas-container:active { cursor: grabbing; }
       #infinite-castle-container { flex: 1; display: flex; align-items: center; justify-content: center; background-color: #000; overflow: hidden; }
+
+      .overlay-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px); transition: opacity 0.3s;}
+      .huge-btn { font-size: 24px; padding: 15px 40px; background: #00ffaa; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s;}
+      .huge-btn:hover { transform: scale(1.05); background: #00cc88;}
+
+      .toggle-group { display: flex; gap: 5px; background: #111; padding: 5px; border-radius: 6px;}
+      .toggle-btn { flex: 1; padding: 8px; background: transparent; border: none; color: #888; cursor: pointer; border-radius: 4px; font-size: 0.9rem;}
+      .toggle-btn.active { background: #444; color: #fff; font-weight: bold;}
+      .map-click-mode .active { background: #00ffaa; color: #000; }
+
+      .primary-btn, .secondary-btn { width: 100%; padding: 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 1rem;}
+      .primary-btn { background: #00ffaa; color: #000; }
+      .primary-btn:hover { background: #00cc88; }
+      .primary-btn.disabled { background: #555; color: #888; cursor: not-allowed; }
+      .secondary-btn { background: #444; color: #fff; }
+      .secondary-btn:hover { background: #666; }
+
+      .playback-controls { background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 15px;}
+      .step-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;}
+      .ctrl-btn { padding: 8px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; cursor: pointer;}
+      .ctrl-btn:hover:not(:disabled) { background: #555; }
+      .ctrl-btn:disabled { background: #222; color: #555; border-color: #333; cursor: not-allowed; }
+
+      .input-group label { display: block; margin-bottom: 5px; font-size: 0.9rem; color: #aaa;}
+      .custom-select { position: relative; width: 100%; font-size: 0.9rem; margin-bottom: 10px;}
+      .select-selected { background-color: #333; color: white; padding: 8px 12px; border: 1px solid #555; border-radius: 4px; cursor: pointer; user-select: none; }
+      .select-items { position: absolute; background-color: #333; top: 100%; left: 0; right: 0; z-index: 99; max-height: 200px; overflow-y: auto; border: 1px solid #555; border-radius: 4px; margin-top: 4px;}
+      .select-items div { padding: 8px 12px; cursor: pointer; color: white; border-bottom: 1px solid #444; }
+      .select-items div:hover { background-color: #00ffaa; color: black; }
+      .select-hide { display: none; }
+      .highlight-text { color: #00ffaa; font-size: 1.2rem; font-weight: bold; }
+      .status-text { color: #aaa; font-size: 0.9rem; margin-top: 10px; line-height: 1.5; }
     </style>
   </head>
-  
 <body>
-  <!-- 新增：頂部切換導覽列 -->
   <div id="top-nav">
     <button id="btn-ntu-map" class="active">🗺️ NTU Map 導航</button>
     <button id="btn-infinite-castle">👹 無限城 Dijkstra 模擬</button>
   </div>
 
   <div class="content-wrapper">
-    <!-- 原本的 NTU Map 介面 -->
-    <div id="ntu-map-view" style="display: flex; width: 100%;">
-      <aside class="sidebar">
+    <div id="ntu-map-view" style="display: flex; width: 100%; position: relative;">
+
+      <aside class="sidebar" id="main-sidebar" class="hidden">
         <h2>NTU Navigator</h2>
         
-        <div class="input-group">
-          <label>起點 (可於地圖點擊)</label>
-          <div class="custom-select" id="startSelectBox">
-            <div class="select-selected" id="startSelected">請選擇起點...</div>
-            <div class="select-items select-hide" id="startItems"></div>
+        <div id="selection-panel">
+          <div class="toggle-group">
+            <button id="mode-auto" class="toggle-btn active">自動演示</button>
+            <button id="mode-manual" class="toggle-btn">手動演示</button>
           </div>
-        </div>
-
-        <div class="input-group">
-          <label>終點 (可於地圖點擊)</label>
-          <div class="custom-select" id="endSelectBox">
-            <div class="select-selected" id="endSelected">請選擇終點...</div>
-            <div class="select-items select-hide" id="endItems"></div>
+          <div class="toggle-group">
+            <button id="algo-dijkstra" class="toggle-btn active">Dijkstra</button>
+            <button id="algo-astar" class="toggle-btn">A*</button>
           </div>
-        </div>
 
-        <button id="searchBtn">開始 Dijkstra 尋路</button>
+          <div class="toggle-group map-click-mode">
+            <button id="click-mode-start" class="toggle-btn active">📍 選取起點</button>
+            <button id="click-mode-end" class="toggle-btn">🏁 選取終點</button>
+          </div>
 
-        <div class="result-box">
-          <h3>📍 導航結果</h3>
-          <p id="distanceOutput">總距離：-- 公尺</p>
+          <div class="input-group">
+            <label>起點</label>
+            <div class="custom-select" id="startSelectBox">
+              <div class="select-selected" id="startSelected">請選擇起點...</div>
+              <div class="select-items select-hide" id="startItems"></div>
+            </div>
+          </div>
+          <div class="input-group">
+            <label>終點</label>
+            <div class="custom-select" id="endSelectBox">
+              <div class="select-selected" id="endSelected">請選擇終點...</div>
+              <div class="select-items select-hide" id="endItems"></div>
+            </div>
+          </div>
+          <button id="searchBtn" class="primary-btn disabled">開始巡路</button>
           
-          <div id="pathOutput" class="path-scroll">
-            請設定起點與終點，並點擊開始規劃。
+          <!-- <button id="btn-reset-weights" class="secondary-btn" style="margin-top:10px;">🔄 恢復預設地圖權重</button> -->
+        </div>
+
+        <div id="playback-panel" class="hidden">
+          <h3>🎞️ 演算法演示中</h3>
+          <div class="playback-controls">
+            <button id="btn-play-pause" class="ctrl-btn">⏸️ 暫停</button>
+            <div class="step-controls">
+              <button id="btn-step-m100" class="ctrl-btn step-btn" disabled>⏮️ -100步</button>
+              <button id="btn-step-m1" class="ctrl-btn step-btn" disabled>◀️ 上一步</button>
+              <button id="btn-step-p1" class="ctrl-btn step-btn" disabled>下一步 ▶️</button>
+              <button id="btn-step-p100" class="ctrl-btn step-btn" disabled>+100步 ⏭️</button>
+            </div>
           </div>
+          <button id="btn-skip-to-end" class="secondary-btn">直接顯示結果</button>
+          <button id="btn-reselect" class="secondary-btn" style="margin-top:10px;">重新選擇</button>
+          <p id="playback-status" class="status-text"></p>
+        </div>
+
+        <div id="result-panel" class="hidden">
+          <h3>📍 導航結果</h3>
+          <p id="distanceOutput" class="highlight-text">總距離：-- 公尺</p>
+          <button id="btn-back-to-select" class="secondary-btn">回到選擇介面</button>
+          <button id="btn-try-again" class="primary-btn" style="margin-top:10px;">再來一次</button>
         </div>
       </aside>
 
       <div id="canvas-container"></div>
     </div>
 
-    <!-- 新增：無限城 Dijkstra 介面 (初始隱藏) -->
     <div id="infinite-castle-view" class="hidden" style="width: 100%; height: 100%;">
-        <!-- p5.js canvas 會被掛載在這裡 -->
         <div id="infinite-castle-container" style="width: 100%; height: 100%;"></div>
     </div>
-
   </div>
 
-  <!-- 載入你原本的 main.js -->
   <script type="module" src="/src/main.js"></script>
-  
-  <!-- 載入新的無限城模組 (稍後建立) -->
   <script type="module" src="/src/infinite-castle.js"></script>
 
-  <!-- 介面切換邏輯 -->
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const btnNtu = document.getElementById('btn-ntu-map');
@@ -115,21 +144,18 @@
       const viewCastle = document.getElementById('infinite-castle-view');
 
       btnNtu.addEventListener('click', () => {
-        btnNtu.classList.add('active');
-        btnCastle.classList.remove('active');
-        viewNtu.classList.remove('hidden');
-        viewCastle.classList.add('hidden');
-        // 可以觸發一個事件讓 p5.js 知道畫面切換了，需要重新 resize
-        window.dispatchEvent(new Event('resize'));
+        btnNtu.classList.add('active'); btnCastle.classList.remove('active');
+        viewNtu.classList.remove('hidden'); viewCastle.classList.add('hidden');
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 50);
       });
 
       btnCastle.addEventListener('click', () => {
-        btnCastle.classList.add('active');
-        btnNtu.classList.remove('active');
-        viewCastle.classList.remove('hidden');
-        viewNtu.classList.add('hidden');
-        window.dispatchEvent(new Event('resize'));
+        btnCastle.classList.add('active'); btnNtu.classList.remove('active');
+        viewCastle.classList.remove('hidden'); viewNtu.classList.add('hidden');
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 50);
       });
+      
+      setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 100);
     });
   </script>
 </body>
