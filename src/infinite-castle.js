@@ -100,8 +100,8 @@ const infiniteCastleSketch = (p) => {
         nextNodeId = 0;
         nodes.push({ 
             id: nextNodeId++, 
-            x: p.width * 0.75, 
-            y: p.height * 0.75, 
+            x: p.width / 2, 
+            y: p.height / 2, 
             label: '無慘', 
             isStart: false, 
             isBoss: true, 
@@ -120,7 +120,7 @@ const infiniteCastleSketch = (p) => {
         startBtn.parent(container);
         startBtn.style('position', 'absolute');
         startBtn.style('left', '50%');
-        startBtn.style('top', '60%');
+        startBtn.style('top', '55%');
         startBtn.style('transform', 'translate(-50%, -50%)');
         startBtn.style('padding', '12px 24px');
         startBtn.style('font-size', '18px');
@@ -131,12 +131,17 @@ const infiniteCastleSketch = (p) => {
         startBtn.style('border-radius', '8px');
         
         startBtn.mousePressed(() => {
+            if (nodes.length > 0 && nodes[0].isBoss) {
+                nodes[0].x = p.width / 2;
+                nodes[0].y = p.height / 2;
+            }
+
             gameState = 'INTRO_OPEN_DOOR'; 
             startBtn.hide();
-            
+
             doorSfx.play().catch(e=>{});
             bgm.play().catch(e=>{});
-            
+
             doorOpenProgress = p.width; 
         });
 
@@ -429,13 +434,16 @@ const infiniteCastleSketch = (p) => {
         p.text(msg, p.width - 320, 70, 280, 100);
         p.pop();
     }
-
-    p.mousePressed = () => {
+    p.mousePressed = (event) => {
         let containerView = document.getElementById('infinite-castle-view');
         if (containerView && containerView.classList.contains('hidden')) return;
         
-        if (p.mouseX < 250 && p.mouseY > p.height - 350) return; 
-        if (p.mouseX > p.width - 300 && p.mouseY > p.height - 100) return;
+        if (event && event.target && event.target.tagName && event.target.tagName.toUpperCase() !== 'CANVAS') {
+            return;
+        }
+
+        if (p.mouseX < 280 && p.mouseY > p.height - 380) return; 
+        if (p.mouseX > p.width - 320 && p.mouseY > p.height - 120) return;
 
         if (gameState !== 'EDIT_GRAPH') return;
 
@@ -443,10 +451,13 @@ const infiniteCastleSketch = (p) => {
 
         if (editMode === 'MOVE' && clickedNode) draggedNode = clickedNode;
         else if (editMode === 'ADD_NODE' && !clickedNode) {
-            let isFirstNode = nodes.length === 1; 
+            let hasDog = nodes.some(n => n.isStart);
+            let isFirstNode = !hasDog; 
+            let roomCount = nodes.filter(n => !n.isBoss && !n.isStart).length;
+
             nodes.push({
                 id: nextNodeId++, x: p.mouseX, y: p.mouseY, 
-                label: isFirstNode ? '我的刀盾' : `房間 ${String.fromCharCode(65 + (nextNodeId % 26))}`, 
+                label: isFirstNode ? '我的刀盾' : `房間 ${String.fromCharCode(65 + (roomCount % 26))}`, 
                 isStart: isFirstNode, 
                 isBoss: false, 
                 cost: Infinity, prev: null, locked: false,
@@ -480,8 +491,15 @@ const infiniteCastleSketch = (p) => {
         else if (editMode === 'SET_WEIGHT') {
             if (!clickedNode) {
                 for (let e of edges) {
-                    let n1 = nodes.find(n => n.id === e.u); let n2 = nodes.find(n => n.id === e.v);
-                    if (distToSegment(p.mouseX, p.mouseY, n1.x, n1.y, n2.x, n2.y) < 20) {
+                    let n1 = nodes.find(n => n.id === e.u); 
+                    let n2 = nodes.find(n => n.id === e.v);
+                    
+                    // 🌟 修改重點 3：算出連線的中點（香菇所在位置）
+                    let midX = (n1.x + n2.x) / 2;
+                    let midY = (n1.y + n2.y) / 2;
+                    
+                    // 🌟 修改重點 4：只要點在香菇圖案附近（半徑 40 內），或者點在連線上，都可以成功觸發修改！
+                    if (p.dist(p.mouseX, p.mouseY, midX, midY) < 40 || distToSegment(p.mouseX, p.mouseY, n1.x, n1.y, n2.x, n2.y) < 20) {
                         let w = parseInt(prompt("修改 Tung Tung 的強度:", e.weight));
                         if (!isNaN(w) && w > 0) e.weight = w;
                         break;
@@ -604,7 +622,6 @@ const infiniteCastleSketch = (p) => {
         let container = document.getElementById('infinite-castle-container');
         if(container) {
             p.resizeCanvas(container.clientWidth, container.clientHeight);
-            if(startBtn) startBtn.position(p.width / 2 - 50, p.height / 2 + 50);
         }
     };
 };
