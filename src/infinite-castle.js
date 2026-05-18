@@ -435,17 +435,14 @@ const infiniteCastleSketch = (p) => {
         p.pop();
     }
 
-    // 🌟 修改重點 1：加入 event 參數，防範 UI 穿透
     p.mousePressed = (event) => {
         let containerView = document.getElementById('infinite-castle-view');
         if (containerView && containerView.classList.contains('hidden')) return;
         
-        // 🛡️ 擋掉點擊在 HTML 元素上的事件，避免穿透到畫布
         if (event && event.target && event.target.tagName && event.target.tagName.toUpperCase() !== 'CANVAS') {
             return;
         }
 
-        // 🛡️ 設定工具列選單的保留安全區
         if (p.mouseX < 280 && p.mouseY > p.height - 380) return; 
         if (p.mouseX > p.width - 320 && p.mouseY > p.height - 120) return;
 
@@ -455,7 +452,6 @@ const infiniteCastleSketch = (p) => {
 
         if (editMode === 'MOVE' && clickedNode) draggedNode = clickedNode;
         else if (editMode === 'ADD_NODE' && !clickedNode) {
-            // 🌟 修正重點 2：確保第一個是狗，後續從 A 開始
             let hasDog = nodes.some(n => n.isStart);
             let isFirstNode = !hasDog; 
             let roomCount = nodes.filter(n => !n.isBoss && !n.isStart).length;
