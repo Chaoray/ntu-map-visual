@@ -483,6 +483,14 @@ function initCustomSelect() {
     createSelectItems('startItems', 'startSelected', (id) => { currentStartId = id; checkReadyToSearch(); });
     createSelectItems('endItems', 'endSelected', (id) => { currentEndId = id; checkReadyToSearch(); });
 
+    const suppressWheel = (e) => {
+        e.stopPropagation();
+    };
+
+    document.querySelectorAll('.custom-select, .select-items, .select-selected').forEach((el) => {
+        el.addEventListener('wheel', suppressWheel, { passive: false });
+    });
+
     document.getElementById('startSelected').onclick = function (e) {
         e.stopPropagation(); closeAllSelect(this);
         document.getElementById('startItems').classList.toggle('select-hide');
